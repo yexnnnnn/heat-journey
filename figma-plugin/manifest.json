@@ -1,0 +1,9 @@
+{
+  "name": "Heat Journey Flow Builder",
+  "id": "heat-journey-flow-builder-local",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": { "allowedDomains": ["none"] }
+}

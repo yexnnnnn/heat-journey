@@ -1,0 +1,874 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Heat Journey · 热量之旅 — Three.js prototype</title>
+<style>
+  :root {
+    --bg:#0E1116; --panel:#161B22; --line:#2A313C; --text:#E6EDF3; --sub:#8B949E;
+    --accent:#F78166; --ok:#3FB950; --warn:#D29922; --bad:#F85149;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text);
+    font-family: "Noto Sans SC","PingFang SC","Microsoft YaHei",Inter,system-ui,sans-serif; }
+  #app { display:grid; grid-template-rows:64px 1fr 104px; grid-template-columns:1fr 420px; height:100vh; }
+  header { grid-column:1 / 3; display:flex; align-items:center; gap:24px; padding:0 24px; background:#0A0D12; }
+  header .brand { font-weight:700; white-space:nowrap; }
+  #progress { display:flex; gap:8px; flex:1; justify-content:flex-end; overflow-x:auto; }
+  #progress button { border:0; border-radius:18px; padding:8px 14px; background:#161B22; color:var(--sub); font:inherit; font-size:13px; cursor:not-allowed; white-space:nowrap; }
+  #progress button.done { background:#23303F; color:#fff; cursor:pointer; }
+  #progress button.now { background:var(--accent); color:#fff; font-weight:700; cursor:default; }
+  #stage { position:relative; margin:16px 0 16px 24px; border-radius:16px; overflow:hidden; background:#000; }
+  #stage canvas { display:block; }
+  #labels { position:absolute; inset:0; pointer-events:none; }
+  .lbl { font-size:12px; font-weight:700; padding:3px 8px; border-radius:6px; background:rgba(14,17,22,.75); color:#fff; white-space:nowrap; transition:opacity .4s; }
+  .pin { pointer-events:auto; cursor:pointer; width:34px; height:34px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700;
+    display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 0 rgba(247,129,102,.7); animation:pulse 1.6s infinite; border:2px solid #fff; }
+  .pin.seen { background:#23303F; animation:none; }
+  @keyframes pulse { 70% { box-shadow:0 0 0 16px rgba(247,129,102,0); } 100% { box-shadow:0 0 0 0 rgba(247,129,102,0); } }
+  #hint { position:absolute; left:16px; bottom:12px; font-size:12px; color:var(--sub); background:rgba(0,0,0,.5); padding:4px 10px; border-radius:6px; }
+  #toast { position:absolute; left:50%; top:16px; transform:translateX(-50%); background:var(--panel); border:1px solid var(--line); padding:10px 16px; border-radius:10px; font-size:14px; opacity:0; transition:opacity .3s; pointer-events:none; max-width:80%; }
+  #toast.show { opacity:1; }
+  aside { margin:16px 24px 16px 16px; background:var(--panel); border-radius:16px; padding:24px; display:flex; flex-direction:column; overflow:hidden; }
+  #panel-body { flex:1; overflow-y:auto; padding-right:4px; }
+  .tag { color:var(--accent); font-size:12px; font-weight:700; letter-spacing:.04em; }
+  h1 { font-size:26px; margin:8px 0 2px; line-height:1.3; }
+  .en { color:var(--sub); font-size:13px; margin-bottom:14px; }
+  .body { font-size:15px; line-height:1.6; margin-bottom:16px; }
+  .body b { color:#fff; }
+  .card { background:#0E1116; border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; font-size:14px; }
+  .opt { display:block; width:100%; text-align:left; font:inherit; font-size:14px; color:var(--text); background:#0E1116; border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:8px; cursor:pointer; }
+  .opt:hover { border-color:var(--accent); }
+  .opt.sel { border-color:var(--accent); background:#2A1A16; }
+  .opt.right { border-color:var(--ok); background:#12261B; }
+  .opt.wrong { border-color:var(--bad); background:#2A1214; }
+  .cta { width:100%; font:inherit; font-size:16px; font-weight:700; color:#fff; background:var(--accent); border:0; border-radius:10px; padding:14px; cursor:pointer; margin-bottom:12px; }
+  .cta.ghost { background:#21262D; }
+  .cta.danger { background:#3D1214; color:var(--bad); border:1px solid var(--bad); }
+  .row { display:flex; justify-content:space-between; align-items:baseline; font-size:13px; color:var(--sub); }
+  .row b { color:#fff; font-size:15px; }
+  input[type=range] { width:100%; accent-color:var(--accent); margin:6px 0 14px; }
+  .seg { display:flex; gap:6px; margin:6px 0 14px; }
+  .seg button { flex:1; font:inherit; font-size:13px; padding:8px; border-radius:8px; border:1px solid var(--line); background:#0E1116; color:var(--text); cursor:pointer; }
+  .seg button.on { border-color:var(--accent); background:#2A1A16; }
+  .bar { height:18px; border-radius:4px; font-size:12px; font-weight:700; color:#0E1116; padding-left:8px; line-height:18px; margin:4px 0 10px; transition:width .6s; }
+  .learn { background:#12261B; color:#7EE787; border-radius:10px; padding:12px 14px; font-size:13px; line-height:1.6; margin:6px 0 10px; }
+  .check { font-size:13px; color:var(--sub); margin-bottom:8px; }
+  .verdict { font-weight:700; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td, th { padding:6px 4px; text-align:left; border-bottom:1px solid var(--line); }
+  th { color:var(--sub); font-weight:400; }
+  .nav { display:flex; gap:12px; padding-top:16px; }
+  .nav button { flex:1; font:inherit; font-size:15px; padding:13px; border-radius:10px; border:0; cursor:pointer; color:#fff; }
+  #back { background:#21262D; }
+  #next { background:var(--accent); font-weight:700; }
+  #next:disabled { background:#30363D; color:var(--sub); cursor:not-allowed; }
+  footer { grid-column:1 / 3; display:flex; align-items:center; gap:24px; padding:0 24px; background:#0A0D12; }
+  .legend { width:300px; flex-shrink:0; font-size:11px; color:var(--sub); }
+  .legend .grad { height:14px; border-radius:7px; margin:6px 0 4px; background:linear-gradient(90deg,#2F81F7 0%,#39C5CF 24%,#E3B341 44%,#F0883E 70%,#F85149 100%); }
+  .legend .ends { display:flex; justify-content:space-between; }
+  #metrics { display:flex; gap:12px; flex:1; }
+  .metric { flex:1; background:#161B22; border:1px solid var(--line); border-radius:10px; padding:10px 14px; min-width:0; transition:opacity .4s; }
+  .metric .k { font-size:11px; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .metric .v { font-size:20px; font-weight:700; margin-top:4px; white-space:nowrap; }
+  .metric.locked { background:#0E1116; border-color:#1C2128; }
+  .metric.locked .v { color:#30363D; font-size:14px; }
+  .metric.alert .v { color:var(--bad); }
+  svg text { fill:var(--sub); font-size:10px; }
+  #fatal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:var(--bg); color:var(--text); text-align:center; padding:40px; line-height:1.8; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="app">
+  <header><div class="brand">HEAT JOURNEY · 热量之旅</div><nav id="progress"></nav></header>
+  <div id="stage"><div id="labels"></div><div id="toast"></div><div id="hint">拖动旋转 · 滚轮缩放 · Drag to orbit · Scroll to zoom</div></div>
+  <aside>
+    <div id="panel-body"></div>
+    <div class="nav"><button id="back">← 上一步 Back</button><button id="next">下一步 Next →</button></div>
+  </aside>
+  <footer>
+    <div class="legend">温度 Temperature<div class="grad"></div><div class="ends"><span>20°C</span><span>45°C</span><span>70°C</span></div></div>
+    <div id="metrics"></div>
+  </footer>
+</div>
+<div id="fatal">无法加载 three.js —— 这个原型需要联网（从 jsDelivr CDN 加载）。<br/>Couldn't load three.js — this prototype needs an internet connection (loads from the jsDelivr CDN).</div>
+
+<script>
+  // Shows a friendly message if the CDN module fails to load
+  window.addEventListener('error', e => { if (String(e.message || '').match(/import|module|fetch/i)) document.getElementById('fatal').style.display = 'flex'; }, true);
+  setTimeout(() => { if (!window.__HJ_READY) document.getElementById('fatal').style.display = 'flex'; }, 12000);
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+window.__HJ_READY = true;
+
+// ════════════════════════════ 1. Simulation model (illustrative) ════════════════════════════
+const SEASON = {
+  summer: { zh: '夏', en: 'Summer', lab: 10, gh: 60, dist: 150 },
+  mid:    { zh: '春秋', en: 'Spring/Autumn', lab: 25, gh: 180, dist: 350 },
+  winter: { zh: '冬', en: 'Winter', lab: 40, gh: 300, dist: 500 },
+};
+const USERS = [
+  { k: 'lab', zh: '机器人实验室', en: 'Robot lab', need: 35 },
+  { k: 'gh', zh: '温室', en: 'Greenhouse', need: 45 },
+  { k: 'dist', zh: '区域供热', en: 'District heating', need: 65 },
+];
+const PRICE_ELEC = 0.20, PRICE_HEAT = 0.07; // £/kWh
+
+function simulate(s) {
+  const P = 1000 * s.load;                 // IT electricity, kW
+  const Q = s.cooling ? P : P;             // ≈100% becomes heat
+  const dT = 10 * s.load * (0.6 / s.flow); // coolant temperature rise
+  const Tr = s.supply + dT;                // primary return temp
+  const chip = s.cooling ? s.supply + dT + 22 * s.load + 3 : s.chipOverride;
+  const T2 = Tr - 3;                       // secondary supply (HX approach 3°C)
+  const COP = 0.4 * (65 + 273) / (65 - T2 + 10);
+  const D = SEASON[s.season];
+  let avail = 0.8 * Q, direct = 0, hpSrc = 0, hpDel = 0, hpElec = 0;
+  const served = {};
+  for (const u of USERS) if (T2 >= u.need) {
+    const take = Math.min(D[u.k], avail); avail -= take; direct += take;
+    served[u.k] = { mode: 'direct', frac: take / D[u.k] };
+  }
+  for (const u of USERS) if (T2 < u.need) {
+    if (!s.hp) { served[u.k] = { mode: 'none', frac: 0 }; continue; }
+    const src = Math.min(D[u.k] * (1 - 1 / COP), avail); avail -= src;
+    const del = src / (1 - 1 / COP);
+    hpSrc += src; hpDel += del; hpElec += del / COP;
+    served[u.k] = { mode: 'hp', frac: del / D[u.k] };
+  }
+  const recovered = direct + hpSrc, rejected = Q - recovered;
+  const chillerFactor = s.supply < 30 ? 0.03 + (30 - s.supply) * 0.025 : 0.03;
+  const coolingElec = Q * 0.02 + rejected * chillerFactor;
+  const total = P + coolingElec + hpElec;
+  const usable = direct + hpDel;
+  const cost = total * PRICE_ELEC - usable * PRICE_HEAT;
+  return { P, Q, Tr, chip, T2, COP, direct, hpDel, hpElec, recovered, rejected, usable, coolingElec, total, cost,
+    recoveryPct: recovered / Q, served, throttle: chip > 85 };
+}
+
+// ════════════════════════════ 2. Screens (same IDs as FLOW.md / Figma) ════════════════════════════
+const STEPS = [
+  ['00', 'HOOK', '开场'], ['01', 'DISCOVER', '认识建筑'], ['02', 'UNDERSTAND', '为什么发热'], ['03', 'TRACE', '追踪热量'],
+  ['04', 'RECOVER', '回收热量'], ['05', 'REUSE', '再利用'], ['06', 'OPTIMIZE', '做决策'], ['07', 'RECAP', '总结'],
+];
+const F = {
+  DC: ['DataCenter', 'Rack1', 'Rack2', 'Rack3', 'Rack4', 'Rack5'],
+  PRIMARY: ['Rack3', 'PrimaryHot', 'PrimaryCold', 'Pump', 'HeatExchanger', 'Packet'],
+  PLANT: ['PlantRoom', 'Pump', 'HeatExchanger', 'HeatPump', 'Tank', 'PrimaryHot', 'PrimaryCold', 'SecondaryHot', 'SecondaryMain', 'Return', 'ToTank'],
+  HX: ['HeatExchanger', 'PrimaryHot', 'PrimaryCold', 'SecondaryHot', 'Return', 'PlantRoom'],
+  HP: ['HeatPump', 'SecondaryHot', 'HeatPumpOut', 'District', 'PlantRoom'],
+  USERS: ['Greenhouse', 'RobotLab', 'District', 'SecondaryMain', 'ToGreenhouse', 'HeatPumpOut', 'Return'],
+  STORE: ['Tank', 'ToTank', 'DryCooler', 'Reject', 'Greenhouse', 'ToGreenhouse', 'SecondaryMain'],
+};
+
+const SCREENS = [
+  { id: 'S0.1', step: 0, cam: 'hero', night: true, pipes: 'off', focus: ['DataCenter', 'DryCooler', 'Rack1', 'Rack2', 'Rack3', 'Rack4', 'Rack5'], metrics: 0,
+    title: '这栋楼每小时用掉 1,000 度电', en: 'This building uses 1,000 kWh every hour.', body: '这些电最后都去哪了？<br/><span class="en">Where does all that electricity end up?</span>', w: 'start' },
+  { id: 'S0.2', step: 0, cam: 'hero', night: true, pipes: 'off', focus: F.DC, metrics: 0,
+    title: '猜一猜', en: 'Make a guess', body: '你觉得这些电最后变成了什么？先选一个，答案稍后揭晓。', w: 'guess' },
+
+  { id: 'S1.1', step: 1, cam: 'full', pipes: 'off', metrics: 0, orbit: true,
+    title: '先认识这座建筑', en: 'Meet the building', body: '这座建筑由四部分组成，它们靠<b>水管</b>连在一起：计算区、地下设备区、热用户、屋顶排热。' },
+  { id: 'S1.2', step: 1, cam: 'full', pipes: 'off', metrics: 0, pins: true,
+    title: '点开每个区域', en: 'Open each zone', body: '在场景里依次点开 4 个 <b>脉冲标记</b>。4 个都看完后，"下一步"才会亮起来。', w: 'pins', gate: 'pins' },
+  { id: 'S1.3', step: 1, cam: 'full', pipes: 'gray', metrics: 0,
+    title: '把它们连起来', en: 'Everything is connected', body: '这些管道是今天的主角。接下来我们看看它们里面流的是什么。',
+    learn: '计算、冷却和用热是连在一起的。',
+    check: { q: '哪个区域负责把多余的热排到空气里？', opts: ['温室', '屋顶干冷器', '热泵'], a: 1 } },
+
+  { id: 'S2.1', step: 2, cam: 'rack', pipes: 'gray', focus: ['Rack3'], metrics: 1, clickRack: true,
+    title: '走近一个机架', en: 'Approach a rack', body: '一个机架 <b>40 kW</b>，差不多是 20 台电热水壶同时烧水。<br/>👉 点击场景里的机架。' },
+  { id: 'S2.2', step: 2, cam: 'rack', pipes: 'gray', focus: ['Rack3'], metrics: 2,
+    title: '让它算起来', en: 'Put it to work', body: '算得越多 → 用电越多 → 热也越多。拖动滑块看看。', w: 'load' },
+  { id: 'S2.3', step: 2, cam: 'rack', pipes: 'gray', focus: ['Rack3'], metrics: 2,
+    title: '几乎所有的电都变成了热', en: 'Almost all electricity becomes heat', body: '计算并不会把能量"存"起来。<b>电进去多少，热就出来多少。</b>', w: 'energy' },
+  { id: 'S2.4', step: 2, cam: 'rack', pipes: 'gray', focus: ['Rack3'], metrics: 2,
+    title: '如果不散热会怎样？', en: 'What if cooling stops?', body: '试试关掉冷却。芯片会在很短时间内降频保护自己 —— 所以散热是 <b>7×24 小时</b>都不能停的事。', w: 'cooling',
+    learn: 'AI 计算不仅需要算力，还需要持续管理热量。',
+    check: { q: '40 kW 的电进去，大约多少热出来？', opts: ['约 4 kW', '约 20 kW', '约 40 kW'], a: 2 } },
+
+  { id: 'S3.1', step: 3, cam: 'trace', pipes: 'gray', focus: F.PRIMARY, metrics: 2, packet: 0,
+    title: '追踪热量', en: 'Trace the heat', body: '跟着这团热走一遍。', w: 'trace' },
+  { id: 'S3.2', step: 3, cam: 'trace', pipes: 'primary', focus: F.PRIMARY, metrics: 2, packet: 0.12, auto: 2600,
+    title: '① 冷板', en: 'Cold plate', body: '贴在芯片上的冷板把热交给水：<b>35°C → 45°C</b>。' },
+  { id: 'S3.3', step: 3, cam: 'trace', pipes: 'primary', focus: F.PRIMARY, metrics: 2, packet: 0.78, auto: 3200,
+    title: '② 泵', en: 'Pump', body: '泵推着热水流到地下设备区。' },
+  { id: 'S3.4', step: 3, cam: 'trace', pipes: 'primary', focus: F.PRIMARY, metrics: 2, packet: 1,
+    title: '③ 热交换器', en: 'Heat exchanger', body: '到了热交换器。热在这里换到<b>另一套水</b>里。' },
+  { id: 'S3.5', step: 3, cam: 'trace', pipes: 'primary', focus: F.PRIMARY, metrics: 3,
+    title: '这是一个闭环', en: "It's a closed loop", body: '降温后的水回到服务器，循环重新开始。<b>流量越小，回水越热。</b>', w: 'flow',
+    learn: '热量不是凭空消失，而是通过冷却系统被转移。',
+    check: { q: '热水离开服务器时大约多少度？', opts: ['25°C', '45°C', '90°C'], a: 1 } },
+
+  { id: 'S4.1', step: 4, cam: 'plant', pipes: 'all', focus: F.PLANT, metrics: 3, hp: false,
+    title: '进入地下设备区', en: 'Go underground', body: '两套水在这里"见面"，但<b>不会混在一起</b>。' },
+  { id: 'S4.2', step: 4, cam: 'hx', pipes: 'all', focus: F.HX, metrics: 3, hp: false,
+    title: '热交换器只能传热', en: 'An exchanger only passes heat on', body: '它能把热<b>传过去</b>，但不能让它<b>更热</b>。所以二次侧比一次侧低约 3°C。', w: 'hx' },
+  { id: 'S4.3', step: 4, cam: 'plant', pipes: 'all', focus: F.PLANT.concat(['Greenhouse', 'RobotLab', 'District']), metrics: 3, hp: false,
+    title: '★ 这些热够不够用？', en: 'Is it hot enough?', body: '同样是热，<b>42°C 能给地暖用，却不够洗热水澡。</b>把热水分别送给三个用户试试。', w: 'thermo' },
+  { id: 'S4.4', step: 4, cam: 'plant', pipes: 'all', focus: F.HP, metrics: 4, w: 'heatpump',
+    title: '热泵：热量的电梯', en: 'Heat pump: an elevator for heat', body: '花一点电，把温度往上抬。',
+    learn: '回收热量不代表它可以直接用于所有场景，温度和设备条件很重要。',
+    check: { q: '哪个用户必须用热泵？', opts: ['机器人实验室（35°C）', '区域供热（65°C）'], a: 1 } },
+
+  { id: 'S5.1', step: 5, cam: 'users', pipes: 'all', focus: F.USERS, metrics: 4, hp: true,
+    title: '谁需要这些热？', en: 'Who needs the heat?', body: '三个用户需要的<b>温度、热量和时间</b>都不一样。', w: 'users' },
+  { id: 'S5.2', step: 5, cam: 'users', pipes: 'all', focus: F.USERS.concat(['Tank', 'ToTank']), metrics: 4, hp: true,
+    title: '★ 24 小时', en: '24 hours', body: '数据中心<b>整天</b>都在产热，温室却主要在<b>晚上</b>要热。拖动时间轴看看。', w: 'timeline' },
+  { id: 'S5.3', step: 5, cam: 'full', pipes: 'all', focus: F.STORE, metrics: 5, hp: true,
+    title: '蓄热罐 & 排热', en: 'Storage & rejection', body: '蓄热罐把白天的热存到晚上用。实在用不掉的热，才从屋顶干冷器排到空气里。', w: 'store',
+    learn: '系统的目标不只是排热，还包括让回收的热量找到合适的用途。',
+    check: { q: '为什么需要蓄热罐？', opts: ['让水更热', '产热和用热的时间对不上', '替代热泵'], a: 1 } },
+
+  { id: 'S6.1', step: 6, cam: 'full', pipes: 'all', metrics: 5, hp: true,
+    title: '现在你来运营', en: 'Now you run the building', body: '先选一个目标，下一屏我们会给你的方案打分。', w: 'mission', gate: 'mission' },
+  { id: 'S6.2', step: 6, cam: 'full', pipes: 'all', metrics: 5, hp: true, orbit: true,
+    title: '控制台', en: 'Console', body: '看看每个滑块会影响哪些数字。', w: 'console' },
+  { id: 'S6.3', step: 6, cam: 'full', pipes: 'all', metrics: 5, hp: true,
+    title: '对比方案', en: 'Compare plans', body: '先把当前设置<b>保存为方案 A</b>，再调整滑块，对比 B。', w: 'compare',
+    learn: '系统各部分相互影响，优化一项指标可能会影响其他指标。' },
+
+  { id: 'S7.1', step: 7, cam: 'full', pipes: 'all', metrics: 5, hp: true, orbit: true,
+    title: '你的热量之旅', en: 'Your heat journey', body: '', w: 'recap' },
+];
+
+// ════════════════════════════ 3. Global state ════════════════════════════
+const state = {
+  i: 0, maxStep: 0,
+  guess: null, pinsSeen: new Set(), mission: null, planA: null, checks: {},
+  load: 0.9, supply: 35, flow: 0.6, season: 'winter', hp: false, cooling: true, chipOverride: 70,
+  hour: 22, sent: {},
+};
+const sim = () => simulate(state);
+
+// ════════════════════════════ 4. Three.js scene ════════════════════════════
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+stage.prepend(renderer.domElement);
+const labelRenderer = new CSS2DRenderer({ element: document.getElementById('labels') });
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
+camera.position.set(3.5, 4, 24);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.target.set(3.5, -0.5, 0);
+controls.minDistance = 2; controls.maxDistance = 45;
+
+const hemi = new THREE.HemisphereLight(0xdfefff, 0x3b3328, 1.1); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-8, 14, 12); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 12, bottom: -8 }); sun.shadow.camera.updateProjectionMatrix(); scene.add(sun);
+const plantLight = new THREE.PointLight(0xffe2b8, 25, 18); plantLight.position.set(2, -1.5, 4); scene.add(plantLight);
+const SKY_DAY = new THREE.Color('#BFD9EE'), SKY_NIGHT = new THREE.Color('#0B1730');
+scene.background = SKY_DAY.clone();
+
+// temperature → color
+const STOPS = [[20, '#2F81F7'], [32, '#39C5CF'], [42, '#E3B341'], [55, '#F0883E'], [70, '#F85149']].map(([t, c]) => [t, new THREE.Color(c)]);
+function tempColor(t) {
+  if (t <= STOPS[0][0]) return STOPS[0][1].clone();
+  for (let k = 1; k < STOPS.length; k++) if (t <= STOPS[k][0]) {
+    const [t0, c0] = STOPS[k - 1], [t1, c1] = STOPS[k];
+    return c0.clone().lerp(c1, (t - t0) / (t1 - t0));
+  }
+  return STOPS[STOPS.length - 1][1].clone();
+}
+const GRAY = new THREE.Color('#6E7681');
+
+// focusable units: name → { group, mats: [] }
+const units = {};
+function unit(name) {
+  const g = new THREE.Group(); g.name = name; scene.add(g);
+  units[name] = { group: g, mats: [], dim: 1, label: null };
+  return g;
+}
+function mesh(u, geo, color, opts = {}) {
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: opts.rough ?? 0.7, metalness: opts.metal ?? 0.1, transparent: true,
+    opacity: opts.opacity ?? 1, emissive: opts.emissive ?? 0x000000, emissiveIntensity: opts.ei ?? 1 });
+  mat.userData.base = mat.opacity;
+  const m = new THREE.Mesh(geo, mat); m.castShadow = !opts.noShadow; m.receiveShadow = true;
+  if (opts.pos) m.position.set(...opts.pos);
+  units[u].group.add(m); units[u].mats.push(mat);
+  return m;
+}
+const B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+function label(u, text, pos) {
+  const el = document.createElement('div'); el.className = 'lbl'; el.textContent = text;
+  const o = new CSS2DObject(el); o.position.set(...pos); units[u].group.add(o); units[u].label = el;
+}
+
+// ground + soil cutaway (not focusable)
+const env = new THREE.Group(); scene.add(env);
+const envMat = (c, o = 1) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, transparent: o < 1, opacity: o });
+const grass = new THREE.Mesh(B(40, 0.3, 6), envMat('#6B8F47')); grass.position.set(4, -0.15, -0.5); grass.receiveShadow = true; env.add(grass);
+const soilBack = new THREE.Mesh(B(40, 5.2, 0.3), envMat('#2A241D')); soilBack.position.set(4, -2.9, -3.4); env.add(soilBack);
+const soilFloor = new THREE.Mesh(B(40, 0.3, 6), envMat('#221D17')); soilFloor.position.set(4, -5.4, -0.5); env.add(soilFloor);
+const cutEdge = new THREE.Mesh(B(40, 0.06, 0.06), new THREE.MeshBasicMaterial({ color: '#8B7B60' })); cutEdge.position.set(4, -0.02, 2.5); env.add(cutEdge);
+
+// data center
+unit('DataCenter');
+mesh('DataCenter', B(8.6, 0.2, 4.6), '#9AA4B0', { pos: [-2, 0.1, -0.3] });
+mesh('DataCenter', B(8.6, 3.4, 0.15), '#D6DCE4', { pos: [-2, 1.9, -2.55] });
+mesh('DataCenter', B(0.15, 3.4, 4.6), '#D6DCE4', { pos: [-6.3, 1.9, -0.3] });
+mesh('DataCenter', B(0.15, 3.4, 4.6), '#D6DCE4', { pos: [2.3, 1.9, -0.3], opacity: 0.35 });
+mesh('DataCenter', B(8.6, 0.15, 4.6), '#C2CAD3', { pos: [-2, 3.6, -0.3], opacity: 0.28, noShadow: true });
+label('DataCenter', '数据中心 Data center', [-2, 4.1, 0]);
+
+const RACK_X = [-5.2, -3.6, -2.0, -0.4, 1.2];
+const gpuMats = [];
+RACK_X.forEach((x, i) => {
+  const n = 'Rack' + (i + 1); unit(n);
+  mesh(n, B(1.0, 2.4, 1.4), '#1F2630', { pos: [x, 1.4, 0], metal: 0.5, rough: 0.4 });
+  for (let k = 0; k < 6; k++) {
+    const m = mesh(n, B(0.8, 0.18, 0.04), '#30363D', { pos: [x, 0.55 + k * 0.33, 0.72], emissive: '#000000' });
+    gpuMats.push({ mat: m.material, rack: i, k });
+  }
+});
+units.Rack3.group.children[0].userData.rack = true;
+
+// dry cooler (roof)
+unit('DryCooler');
+mesh('DryCooler', B(2, 0.5, 1.4), '#8B949E', { pos: [0.6, 4.0, -0.5], metal: 0.4 });
+const fans = [];
+for (let k = 0; k < 3; k++) {
+  const f = mesh('DryCooler', B(0.5, 0.05, 0.08), '#30363D', { pos: [-0.05 + k * 0.65, 4.28, -0.5] });
+  fans.push(f);
+}
+label('DryCooler', '屋顶干冷器 Dry cooler', [0.6, 4.7, -0.5]);
+
+// greenhouse
+unit('Greenhouse');
+mesh('Greenhouse', B(3.6, 1.8, 3), '#A8E0C8', { pos: [5.7, 0.9, -0.5], opacity: 0.4, rough: 0.1, noShadow: true });
+const roofGeo = new THREE.CylinderGeometry(1.25, 1.25, 3.6, 3, 1); roofGeo.rotateZ(Math.PI / 2);
+const gr = mesh('Greenhouse', roofGeo, '#CDEFE0', { pos: [5.7, 2.18, -0.5], opacity: 0.45, rough: 0.1, noShadow: true });
+gr.rotation.x = -Math.PI / 2; gr.scale.set(1, 1.38, 0.6); // apex up, spans the 3-deep glasshouse
+for (let k = 0; k < 8; k++) mesh('Greenhouse', new THREE.SphereGeometry(0.22, 12, 8), '#3FB950', { pos: [4.3 + (k % 4) * 0.9, 0.3, -1.2 + Math.floor(k / 4) * 1.2] });
+label('Greenhouse', '温室 Greenhouse · 45°C', [5.7, 3.4, -0.5]);
+
+// robot lab
+unit('RobotLab');
+mesh('RobotLab', B(2.2, 2.0, 2.4), '#C9B8E8', { pos: [8.9, 1.0, -0.8], opacity: 0.85 });
+mesh('RobotLab', new THREE.CylinderGeometry(0.3, 0.4, 0.8, 16), '#6E40C9', { pos: [8.9, 0.4, 0.7] });
+mesh('RobotLab', new THREE.SphereGeometry(0.25, 16, 12), '#B392F0', { pos: [8.9, 1.0, 0.7] });
+label('RobotLab', '机器人实验室 Robot lab · 35°C', [8.9, 2.5, -0.5]);
+
+// district houses
+unit('District');
+for (let k = 0; k < 3; k++) {
+  const x = 11.2 + k * 1.3;
+  mesh('District', B(1, 1, 1.2), '#E6C9A8', { pos: [x, 0.5, -0.6] });
+  const r = mesh('District', new THREE.ConeGeometry(0.85, 0.6, 4), '#B5651D', { pos: [x, 1.3, -0.6] }); r.rotation.y = Math.PI / 4;
+}
+label('District', '区域供热 District · 65°C', [12.5, 2.1, -0.5]);
+
+// plant room
+unit('PlantRoom');
+mesh('PlantRoom', B(18, 0.2, 4.6), '#4A505A', { pos: [3, -4.5, -0.6] });
+mesh('PlantRoom', B(18, 3.8, 0.15), '#3B414A', { pos: [3, -2.6, -2.9] });
+label('PlantRoom', '地下设备区 Plant room', [-4.6, -0.9, 0]);
+
+// equipment
+unit('Pump');
+const pumpBody = mesh('Pump', new THREE.CylinderGeometry(0.42, 0.42, 0.7, 24), '#58A6FF', { pos: [-4.6, -3.0, 1.2], metal: 0.5 });
+pumpBody.rotation.x = Math.PI / 2;
+const impeller = mesh('Pump', B(0.7, 0.1, 0.1), '#0D419D', { pos: [-4.6, -3.0, 1.6] });
+label('Pump', '泵 Pump', [-4.6, -3.7, 1.2]);
+
+unit('HeatExchanger');
+mesh('HeatExchanger', B(1.5, 1.6, 1.6), '#8B949E', { pos: [-1.6, -3.0, 0.9], opacity: 0.55, metal: 0.6, rough: 0.3 });
+const hxPlates = [];
+for (let k = 0; k < 7; k++) hxPlates.push(mesh('HeatExchanger', B(0.08, 1.3, 1.3), k % 2 ? '#E3B341' : '#F0883E', { pos: [-2.15 + k * 0.18, -3.0, 0.9], emissive: k % 2 ? '#E3B341' : '#F0883E', ei: 0.2 }));
+label('HeatExchanger', '热交换器 Heat exchanger', [-1.6, -1.9, 0.9]);
+
+unit('HeatPump');
+mesh('HeatPump', B(2.0, 1.6, 1.6), '#484F58', { pos: [2.3, -3.0, 0.3], metal: 0.4 });
+const compressor = mesh('HeatPump', new THREE.SphereGeometry(0.45, 24, 16), '#6E7681', { pos: [1.9, -3.0, 1.15], emissive: '#000000' });
+label('HeatPump', '热泵 Heat pump', [2.3, -1.9, 0.3]);
+
+unit('Tank');
+mesh('Tank', new THREE.CylinderGeometry(0.7, 0.7, 2.8, 32), '#30363D', { pos: [4.6, -2.9, 0], opacity: 0.45, metal: 0.4 });
+const tankLevel = mesh('Tank', new THREE.CylinderGeometry(0.62, 0.62, 1, 32), '#E3B341', { pos: [4.6, -3.6, 0], emissive: '#E3B341', ei: 0.25 });
+label('Tank', '蓄热罐 Storage tank', [4.6, -1.2, 0]);
+
+// ── pipes with flowing particles ──
+const PIPE_DEF = [
+  { n: 'PrimaryHot', set: 'primary', r: 0.11, z: 1.2, pts: [[1.6, 2.75], [-5.9, 2.75], [-5.9, -3.0], [-2.35, -3.0]] },
+  { n: 'PrimaryCold', set: 'primary', r: 0.11, z: 1.2, pts: [[-1.0, -2.4], [-1.0, 0.3], [-5.5, 0.3]] },
+  { n: 'SecondaryHot', set: 'secondary', r: 0.09, z: 0.3, pts: [[-0.85, -3.0], [1.3, -3.0]] },
+  { n: 'SecondaryMain', set: 'secondary', r: 0.09, z: 0.3, pts: [[0.3, -3.0], [0.3, -1.0], [8.4, -1.0], [8.4, 0.1]] },
+  { n: 'ToGreenhouse', set: 'secondary', r: 0.08, z: 0.3, pts: [[5.6, -1.0], [5.6, 0.1]] },
+  { n: 'ToTank', set: 'secondary', r: 0.08, z: 0.3, pts: [[4.6, -1.0], [4.6, -1.5]] },
+  { n: 'Return', set: 'secondary', r: 0.08, z: -0.6, pts: [[9.6, 0.1], [9.6, -4.1], [-1.6, -4.1], [-1.6, -3.8]] },
+  { n: 'HeatPumpOut', set: 'hp', r: 0.09, z: -0.2, pts: [[2.8, -2.2], [2.8, -0.55], [12.5, -0.55], [12.5, 0.1]] },
+  { n: 'Reject', set: 'reject', r: 0.08, z: 0.3, pts: [[3.2, -1.0], [3.2, 4.0], [1.6, 4.0]] },
+];
+const pipes = {};
+const pGeo = new THREE.SphereGeometry(0.07, 8, 6);
+for (const d of PIPE_DEF) {
+  unit(d.n);
+  const path = new THREE.CurvePath();
+  for (let k = 1; k < d.pts.length; k++) path.add(new THREE.LineCurve3(new THREE.Vector3(d.pts[k - 1][0], d.pts[k - 1][1], d.z), new THREE.Vector3(d.pts[k][0], d.pts[k][1], d.z)));
+  const tube = mesh(d.n, new THREE.TubeGeometry(path, 64 * d.pts.length, d.r, 10, false), GRAY, { metal: 0.3, rough: 0.4, emissive: '#000000' });
+  const len = path.getLength();
+  const count = Math.max(4, Math.round(len * 2.2));
+  const pmat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.95 });
+  pmat.userData.base = 0.95;
+  const inst = new THREE.InstancedMesh(pGeo, pmat, count); inst.frustumCulled = false;
+  units[d.n].group.add(inst); units[d.n].mats.push(pmat);
+  pipes[d.n] = { d, path, tube, inst, count, len, offset: 0, active: false, temp: 30, speed: 1 };
+}
+
+// heat packet (trace)
+unit('Packet');
+const packetPath = new THREE.CurvePath();
+[[[-2.0, 1.4, 0.8], [-2.0, 2.75, 1.2]], [[-2.0, 2.75, 1.2], [-5.9, 2.75, 1.2]], [[-5.9, 2.75, 1.2], [-5.9, -3.0, 1.2]], [[-5.9, -3.0, 1.2], [-2.35, -3.0, 1.2]]]
+  .forEach(([a, b]) => packetPath.add(new THREE.LineCurve3(new THREE.Vector3(...a), new THREE.Vector3(...b))));
+const packet = mesh('Packet', new THREE.SphereGeometry(0.28, 24, 16), '#FFB86B', { emissive: '#F85149', ei: 2.5, noShadow: true });
+const packetLight = new THREE.PointLight('#FF7A45', 0, 5); units.Packet.group.add(packetLight);
+let packetT = 0, packetTarget = 0;
+
+// pins (S1.2)
+const PINS = [
+  { k: 'compute', n: '①', pos: [-2, 3.2, 1.6], t: '① 计算区 Compute', d: '25 个 GPU 机架，每个约 40 kW。这里把电变成计算 —— 也变成热。' },
+  { k: 'plant', n: '②', pos: [1, -1.6, 2.2], t: '② 地下设备区 Plant room', d: '泵、热交换器、热泵、蓄热罐。负责搬运热、提升温度、存储热。' },
+  { k: 'users', n: '③', pos: [8, 2.8, 1], t: '③ 热用户 Heat users', d: '温室、机器人实验室、区域供热。它们需要的温度各不相同。' },
+  { k: 'reject', n: '④', pos: [0.6, 5.1, 0.6], t: '④ 排热 Heat rejection', d: '没人需要的热，由屋顶干冷器排到空气里。' },
+];
+const pinObjs = PINS.map(p => {
+  const el = document.createElement('div'); el.className = 'pin'; el.textContent = p.n;
+  el.addEventListener('click', ev => { ev.stopPropagation(); state.pinsSeen.add(p.k); el.classList.add('seen'); toast('<b>' + p.t + '</b><br/>' + p.d, 4200); renderPanel(); });
+  const o = new CSS2DObject(el); o.position.set(...p.pos); scene.add(o); return o;
+});
+
+// ════════════════════════════ 5. Camera presets & tween ════════════════════════════
+const CAMS = {
+  full:  { p: [4, 3.5, 25], t: [3.8, -0.6, 0] },
+  hero:  { p: [-6, 3.5, 15], t: [-1.5, 1.6, 0] },
+  rack:  { p: [-1.0, 1.9, 4.6], t: [-2.0, 1.4, 0] },
+  trace: { p: [-2.0, 0.3, 13.5], t: [-3.0, -0.2, 0] },
+  plant: { p: [2.5, -1.4, 12.5], t: [2.0, -2.7, 0] },
+  hx:    { p: [-0.4, -2.4, 5.2], t: [-1.5, -3.0, 0.6] },
+  users: { p: [9.5, 2.2, 12], t: [8.8, 0.2, 0] },
+};
+let tween = null;
+function flyTo(key) {
+  const c = CAMS[key];
+  tween = { t: 0, fromP: camera.position.clone(), fromT: controls.target.clone(), toP: new THREE.Vector3(...c.p), toT: new THREE.Vector3(...c.t) };
+}
+const ease = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+
+// ════════════════════════════ 6. Applying a screen to the 3D scene ════════════════════════════
+let night = 0, nightTarget = 0, tankFill = 0.5, tankTarget = 0.5;
+
+function applyScene() {
+  const sc = SCREENS[state.i];
+  const r = sim();
+  // focus / dim
+  for (const name in units) {
+    const u = units[name];
+    const focused = !sc.focus || sc.focus.includes(name);
+    u.dim = focused ? 1 : 0.1;
+    if (u.label) u.label.style.opacity = focused ? 1 : 0.15;
+  }
+  units.Packet.dim = sc.packet !== undefined ? 1 : 0;
+  // pipe colors / activity
+  const temps = { PrimaryHot: r.Tr, PrimaryCold: state.supply, SecondaryHot: r.T2, SecondaryMain: r.T2, ToGreenhouse: r.T2, ToTank: r.T2,
+    Return: Math.max(r.T2 - 10, 22), HeatPumpOut: 65, Reject: r.T2 };
+  for (const n in pipes) {
+    const p = pipes[n];
+    let visible = sc.pipes !== 'off', colored = false;
+    if (sc.pipes === 'primary') colored = p.d.set === 'primary';
+    if (sc.pipes === 'all') colored = p.d.set !== 'hp' || state.hp;
+    if (p.d.set === 'primary' && !state.cooling) colored = false;
+    if (n === 'Reject' && sc.pipes === 'all') colored = r.rejected > 1;
+    p.active = colored; p.temp = temps[n];
+    p.speed = (p.d.set === 'primary' ? state.flow * 2.2 : 1.1) * (0.4 + state.load);
+    const col = colored ? tempColor(p.temp) : GRAY;
+    p.tube.material.color.copy(col); p.tube.material.emissive.copy(colored ? col : new THREE.Color(0)).multiplyScalar(0.35);
+    p.inst.material.color.copy(col).lerp(new THREE.Color('#ffffff'), 0.45);
+    p.inst.visible = colored; units[n].group.visible = visible;
+  }
+  // heat pump
+  compressor.material.color.set(state.hp ? '#F85149' : '#6E7681');
+  compressor.material.emissive.set(state.hp ? '#F85149' : '#000000');
+  // heat exchanger plates follow temperatures
+  hxPlates.forEach((m, k) => { const c = tempColor(k % 2 ? r.T2 : r.Tr); m.material.color.copy(c); m.material.emissive.copy(c); });
+  // sky
+  nightTarget = sc.w === 'timeline' ? nightFromHour(state.hour) : (sc.night ? 1 : 0);
+  // pins
+  pinObjs.forEach(o => { o.element.style.display = sc.pins ? 'flex' : 'none'; });
+  // packet target
+  if (sc.packet !== undefined) packetTarget = sc.packet;
+  controls.autoRotate = false;
+}
+const nightFromHour = h => { const d = Math.cos(((h - 13) / 24) * Math.PI * 2); return THREE.MathUtils.clamp(0.5 - d * 0.9, 0, 1); };
+
+// ════════════════════════════ 7. Render loop ════════════════════════════
+const clock = new THREE.Clock();
+const tmpM = new THREE.Matrix4(), tmpV = new THREE.Vector3();
+function frame() {
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  const r = sim(); const sc = SCREENS[state.i];
+
+  if (tween) {
+    tween.t = Math.min(1, tween.t + dt / 1.3); const k = ease(tween.t);
+    camera.position.lerpVectors(tween.fromP, tween.toP, k); controls.target.lerpVectors(tween.fromT, tween.toT, k);
+    if (tween.t >= 1) tween = null;
+  }
+  controls.update();
+
+  // opacity easing for focus
+  for (const name in units) {
+    const u = units[name];
+    for (const m of u.mats) m.opacity += ((m.userData.base ?? 1) * u.dim - m.opacity) * Math.min(1, dt * 6);
+  }
+  // GPUs
+  const chipT = r.chip;
+  const gpuCol = tempColor(THREE.MathUtils.mapLinear(chipT, 40, 95, 30, 70));
+  gpuMats.forEach(({ mat, rack, k }) => {
+    const flick = 0.55 + 0.45 * Math.abs(Math.sin(t * (3 + rack) + k * 1.7));
+    mat.color.copy(gpuCol); mat.emissive.copy(gpuCol).multiplyScalar(flick * (0.3 + state.load) * (r.throttle ? (Math.sin(t * 12) > 0 ? 1.4 : 0.2) : 1));
+  });
+  // cooling off ramp
+  if (!state.cooling) { state.chipOverride = Math.min(98, state.chipOverride + dt * 6); if (sc.w === 'cooling') updateLive(); }
+
+  // particles
+  for (const n in pipes) {
+    const p = pipes[n]; if (!p.active) continue;
+    p.offset = (p.offset + dt * p.speed / p.len) % 1;
+    for (let k = 0; k < p.count; k++) {
+      const u = (k / p.count + p.offset) % 1;
+      p.path.getPointAt(u, tmpV); tmpM.makeTranslation(tmpV.x, tmpV.y, tmpV.z + p.d.r * 0.2);
+      p.inst.setMatrixAt(k, tmpM);
+    }
+    p.inst.instanceMatrix.needsUpdate = true;
+  }
+  // packet
+  packetT += (packetTarget - packetT) * Math.min(1, dt * 1.2);
+  packetPath.getPointAt(THREE.MathUtils.clamp(packetT, 0, 1), packet.position);
+  packetLight.position.copy(packet.position); packetLight.intensity = units.Packet.dim * (6 + Math.sin(t * 6) * 2);
+  packet.scale.setScalar(1 + Math.sin(t * 6) * 0.1);
+  packet.material.color.copy(tempColor(THREE.MathUtils.lerp(70, 45, THREE.MathUtils.clamp(packetT * 4, 0, 1))));
+
+  // equipment animation
+  impeller.rotation.z += dt * 8 * state.flow * (state.cooling ? 1 : 0);
+  const rejecting = r.rejected > 1 && SCREENS[state.i].pipes === 'all';
+  fans.forEach(f => f.rotation.y += dt * (rejecting ? 10 * (r.rejected / 800 + 0.2) : 0.5));
+  compressor.scale.setScalar(state.hp ? 1 + Math.sin(t * 14) * 0.04 : 1);
+
+  // tank
+  if (sc.w === 'store') tankTarget = 0.5 + 0.45 * Math.sin(t * 0.8);
+  tankFill += (tankTarget - tankFill) * Math.min(1, dt * 2);
+  tankLevel.scale.y = Math.max(0.05, tankFill * 2.6); tankLevel.position.y = -4.3 + tankLevel.scale.y / 2;
+
+  // sky / lights
+  night += (nightTarget - night) * Math.min(1, dt * 2);
+  scene.background.copy(SKY_DAY).lerp(SKY_NIGHT, night);
+  sun.intensity = 1.6 * (1 - night * 0.8); hemi.intensity = 1.1 * (1 - night * 0.6);
+
+  renderer.render(scene, camera); labelRenderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+// raycast click (rack in S2.1)
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+renderer.domElement.addEventListener('click', e => {
+  const sc = SCREENS[state.i]; if (!sc.clickRack) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  if (ray.intersectObjects(units.Rack3.group.children, false).length) go(state.i + 1);
+});
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h); labelRenderer.setSize(w, h);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+// ════════════════════════════ 8. UI: progress, metrics, panel ════════════════════════════
+const $ = s => document.querySelector(s);
+const fmt = (n, d = 0) => n.toLocaleString('en-GB', { maximumFractionDigits: d, minimumFractionDigits: d });
+
+function renderProgress() {
+  const cur = SCREENS[state.i].step;
+  $('#progress').innerHTML = STEPS.map(([n, en, zh], s) => {
+    const cls = s === cur ? 'now' : s <= state.maxStep ? 'done' : '';
+    return `<button class="${cls}" data-s="${s}" title="${en}">${n} ${zh}</button>`;
+  }).join('');
+  $('#progress').querySelectorAll('button').forEach(b => b.onclick = () => {
+    const s = +b.dataset.s; if (s <= state.maxStep && s !== cur) go(SCREENS.findIndex(x => x.step === s));
+  });
+}
+
+const METRICS = [
+  { k: 'power', zh: '总功耗', en: 'Total power', v: r => fmt(r.total) + ' kW' },
+  { k: 'chip', zh: '芯片温度', en: 'Chip temp', v: r => fmt(r.chip) + '°C', alert: r => r.throttle },
+  { k: 'ret', zh: '回水温度', en: 'Return temp', v: r => fmt(r.Tr) + '°C' },
+  { k: 'usable', zh: '可利用热', en: 'Usable heat', v: r => fmt(r.usable) + ' kW · ' + fmt(r.recoveryPct * 100) + '%' },
+  { k: 'cost', zh: '净运行成本', en: 'Net cost', v: r => '£' + fmt(r.cost) + '/h' },
+];
+function renderMetrics() {
+  const sc = SCREENS[state.i], r = sim();
+  $('#metrics').innerHTML = METRICS.map((m, i) => {
+    const on = i < sc.metrics; const alert = on && m.alert && m.alert(r);
+    return `<div class="metric ${on ? '' : 'locked'} ${alert ? 'alert' : ''}"><div class="k">${m.zh} ${m.en}</div><div class="v">${on ? m.v(r) : '— 未解锁 locked'}</div></div>`;
+  }).join('');
+}
+
+let toastTimer;
+function toast(html, ms = 2600) {
+  const el = $('#toast'); el.innerHTML = html; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+// widgets: return HTML + a bind() for events
+const W = {
+  start: () => ({ html: `<button class="cta" id="w-start">开始 Start →</button>`, bind: () => $('#w-start').onclick = () => go(1) }),
+
+  guess: () => ({
+    html: [['A', '变成了"计算"', 'It becomes computation'], ['B', '大部分变成了热', 'Most of it becomes heat'], ['C', '存进了电池', 'Stored in batteries']]
+      .map(([k, zh, en]) => `<button class="opt ${state.guess === k ? 'sel' : ''}" data-k="${k}"><b>${k}</b> · ${zh}<br/><span class="en">${en}</span></button>`).join(''),
+    bind: () => document.querySelectorAll('.opt[data-k]').forEach(b => b.onclick = () => { state.guess = b.dataset.k; renderPanel(); }),
+  }),
+
+  pins: () => ({ html: `<div class="card">已查看 Opened: <b>${state.pinsSeen.size} / 4</b></div>` }),
+
+  load: () => ({
+    html: `<div class="row">GPU 负载 Load <b id="v-load"></b></div><input type="range" id="i-load" min="0.3" max="1" step="0.01" value="${state.load}">
+      <div class="row">机架功耗 Rack power <b id="v-rack"></b></div><div class="row" style="margin-top:6px">芯片温度 Chip temp <b id="v-chip"></b></div>`,
+    bind: () => { $('#i-load').oninput = e => { state.load = +e.target.value; updateLive(); }; },
+    live: r => { $('#v-load').textContent = fmt(state.load * 100) + '%'; $('#v-rack').textContent = fmt(40 * state.load, 1) + ' kW'; $('#v-chip').textContent = fmt(r.chip) + '°C'; },
+  }),
+
+  energy: () => {
+    const right = state.guess === 'B';
+    const g = state.guess ? `<div class="card">你在开场选的是 <b>${state.guess}</b> —— ${right ? '<span class="ok">答对了！</span>' : '<span class="warn">其实是 B。</span>'}</div>` : '';
+    const kw = 40 * state.load;
+    return { html: `${g}<div class="card">⚡ 电 Electricity in<div class="bar" style="width:100%;background:#E3B341">${fmt(kw, 1)} kW</div>
+      ♨ 热 Heat out<div class="bar" style="width:99%;background:#F85149">≈ ${fmt(kw, 1)} kW (≈100%)</div>
+      <span class="en">1 kWh in → ≈ 1 kWh of heat out</span></div>` };
+  },
+
+  cooling: () => ({
+    html: `<button class="cta ${state.cooling ? 'danger' : 'ghost'}" id="w-cool">${state.cooling ? '关掉冷却 Turn off cooling' : '恢复冷却 Restore cooling'}</button>
+      <div class="row">芯片温度 Chip temp <b id="v-chip"></b></div><div id="v-alarm" class="card" style="margin-top:10px"></div>`,
+    bind: () => $('#w-cool').onclick = () => { state.cooling = !state.cooling; state.chipOverride = sim().chip; if (state.cooling) state.chipOverride = 70; applyScene(); renderPanel(); },
+    live: r => {
+      $('#v-chip').textContent = fmt(r.chip) + '°C';
+      $('#v-alarm').innerHTML = r.throttle ? '<span class="bad verdict">⚠ 降频 THROTTLING —— 算力下降，芯片在自我保护</span>'
+        : state.cooling ? '<span class="ok">冷却正常 Cooling OK</span>' : '<span class="warn">温度上升中… Rising…</span>';
+    },
+  }),
+
+  trace: () => ({ html: `<button class="cta" id="w-trace">追踪热量 Trace the heat ▶</button>`, bind: () => $('#w-trace').onclick = () => go(state.i + 1) }),
+
+  flow: () => ({
+    html: `<div class="row">流量 Flow <b id="v-flow"></b></div><input type="range" id="i-flow" min="0.3" max="1" step="0.01" value="${state.flow}">
+      <div class="row">供水 Supply <b>${fmt(state.supply)}°C</b></div><div class="row" style="margin-top:6px">回水 Return <b id="v-ret"></b></div>`,
+    bind: () => $('#i-flow').oninput = e => { state.flow = +e.target.value; applyScene(); updateLive(); },
+    live: r => { $('#v-flow').textContent = fmt(state.flow * 100) + '%'; $('#v-ret').textContent = fmt(r.Tr, 1) + '°C'; },
+  }),
+
+  hx: () => {
+    const r = sim();
+    return { html: `<div class="card"><div class="row">一次侧 Primary <b>${fmt(r.Tr)}°C → ${fmt(state.supply)}°C</b></div>
+      <div class="row" style="margin-top:8px">二次侧 Secondary <b>${fmt(Math.max(r.T2 - 10, 22))}°C → ${fmt(r.T2)}°C</b></div></div>
+      <div class="en">两套水被金属板隔开，热穿过板子，水不会混合。<br/>The loops are separated by metal plates; heat crosses, water doesn't.</div>` };
+  },
+
+  thermo: () => {
+    const T2 = sim().T2;
+    return {
+      html: USERS.map(u => {
+        const s = state.sent[u.k]; let v = '';
+        if (s) v = T2 >= u.need ? `<span class="ok verdict">√ 直接可用</span>` : (u.need - T2 <= 4 ? `<span class="warn verdict">≈ 差一点</span>` : `<span class="bad verdict">× 不够热，需要热泵</span>`);
+        return `<button class="opt" data-u="${u.k}"><div class="row"><span>送给 <b>${u.zh}</b></span>${v}</div><span class="en">需要 needs ${u.need}°C · 现有 have ${fmt(T2)}°C</span></button>`;
+      }).join(''),
+      bind: () => document.querySelectorAll('.opt[data-u]').forEach(b => b.onclick = () => { state.sent[b.dataset.u] = true; renderPanel(); }),
+    };
+  },
+
+  heatpump: () => {
+    const r = sim();
+    return {
+      html: `<div class="card" style="font-size:15px">⚡ <b>1</b> 份电 + ♨ <b>${fmt(r.COP - 1, 1)}</b> 份 ${fmt(r.T2)}°C 的热 = ♨ <b>${fmt(r.COP, 1)}</b> 份 65°C 的热
+        <div class="en" style="margin:6px 0 0">COP ≈ ${fmt(r.COP, 1)} — 进水越热，热泵越省电 / the warmer the input, the cheaper the lift</div></div>
+        <button class="cta ${state.hp ? 'ghost' : 'danger'}" id="w-hp">${state.hp ? '热泵运行中 Running ✓（点击关闭）' : '启动热泵 Start heat pump'}</button>`,
+      bind: () => $('#w-hp').onclick = () => { state.hp = !state.hp; applyScene(); renderPanel(); },
+    };
+  },
+
+  users: () => {
+    const D = SEASON[state.season], when = { lab: '白天 Daytime', gh: '夜间 & 冬季 Nights & winter', dist: '全天 All day' };
+    return { html: USERS.map(u => `<div class="card"><b>${u.zh} ${u.en}</b><div class="row" style="margin-top:4px"><span>${u.need}°C · ${D[u.k]} kW</span><span>${when[u.k]}</span></div></div>`).join('') };
+  },
+
+  timeline: () => ({
+    html: `<div class="row">时间 Time <b id="v-hour"></b></div><input type="range" id="i-hour" min="0" max="23.9" step="0.1" value="${state.hour}">
+      <div class="card"><svg viewBox="0 0 320 120" width="100%" id="chart"></svg>
+      <div class="en" style="margin:0"><span style="color:#F0883E">━</span> 可回收热 supply &nbsp; <span style="color:#3FB950">━</span> 总热需求 demand</div></div><div id="v-tank" class="card"></div>`,
+    bind: () => $('#i-hour').oninput = e => { state.hour = +e.target.value; nightTarget = nightFromHour(state.hour); updateLive(); },
+    live: () => {
+      const supply = 0.8 * 1000 * state.load, D = SEASON[state.season];
+      const dem = h => D.lab * (h > 8 && h < 19 ? 1 : 0.3) + D.gh * (0.25 + 0.75 * nightFromHour(h)) + D.dist * (0.8 + 0.2 * Math.cos((h - 7) / 24 * Math.PI * 2));
+      const maxV = 1000, X = h => h / 24 * 320, Y = v => 110 - v / maxV * 100;
+      let path = ''; for (let h = 0; h <= 24; h += 0.5) path += (h ? 'L' : 'M') + X(h).toFixed(1) + ' ' + Y(dem(h)).toFixed(1);
+      $('#chart').innerHTML = `<path d="M0 ${Y(supply)} L320 ${Y(supply)}" stroke="#F0883E" stroke-width="2.5" fill="none"/>
+        <path d="${path}" stroke="#3FB950" stroke-width="2.5" fill="none"/>
+        <line x1="${X(state.hour)}" x2="${X(state.hour)}" y1="4" y2="112" stroke="#fff" stroke-width="1.5"/>
+        ${[0, 6, 12, 18].map(h => `<text x="${X(h) + 2}" y="119">${h}:00</text>`).join('')}`;
+      const d = dem(state.hour), diff = supply - d;
+      $('#v-hour').textContent = String(Math.floor(state.hour)).padStart(2, '0') + ':' + String(Math.round((state.hour % 1) * 60)).padStart(2, '0');
+      tankTarget = THREE.MathUtils.clamp(0.5 + diff / 800, 0.08, 0.95);
+      $('#v-tank').innerHTML = diff > 0
+        ? `<span class="ok verdict">热有多余 +${fmt(diff)} kW</span> → 存进蓄热罐 charging the tank`
+        : `<span class="warn verdict">热不够 ${fmt(diff)} kW</span> → 从蓄热罐取热 drawing from the tank`;
+    },
+  }),
+
+  store: () => {
+    const r = sim();
+    return { html: `<div class="card"><div class="row">回收 Recovered <b>${fmt(r.recovered)} kW</b></div><div class="row" style="margin-top:6px">排到空气 Rejected <b>${fmt(r.rejected)} kW</b></div></div>
+      <div class="en">看屋顶风扇：没人用的热越多，转得越快。<br/>Watch the roof fans — the more unused heat, the faster they spin.</div>` };
+  },
+
+  mission: () => ({
+    html: [['reuse', '🌱 回收最多热量', 'Max heat reuse'], ['cost', '💰 成本最低', 'Lowest cost'], ['safe', '🛡 GPU 最安全', 'Safest GPUs']]
+      .map(([k, zh, en]) => `<button class="opt ${state.mission === k ? 'sel' : ''}" data-m="${k}"><b>${zh}</b><br/><span class="en">${en}</span></button>`).join(''),
+    bind: () => document.querySelectorAll('.opt[data-m]').forEach(b => b.onclick = () => { state.mission = b.dataset.m; renderPanel(); }),
+  }),
+
+  console: () => ({ html: consoleHTML() + `<div id="v-score" class="card"></div>`, bind: bindConsole, live: r => { liveConsole(r); liveScore(r); } }),
+
+  compare: () => ({
+    html: consoleHTML(true) + `<button class="cta ghost" id="w-save">保存为方案 A  Save as plan A</button><div id="v-cmp"></div>`,
+    bind: () => { bindConsole(); $('#w-save').onclick = () => { state.planA = { ...sim(), supply: state.supply, load: state.load, season: state.season }; updateLive(); toast('已保存方案 A · Plan A saved'); }; },
+    live: r => {
+      liveConsole(r);
+      const A = state.planA, B = { ...r, supply: state.supply };
+      const rows = [['供水温度 Supply', x => fmt(x.supply) + '°C'], ['可利用热 Usable', x => fmt(x.usable) + ' kW'], ['回收率 Recovery', x => fmt(x.recoveryPct * 100) + '%'],
+        ['热泵耗电 HP power', x => fmt(x.hpElec) + ' kW'], ['芯片温度 Chip', x => fmt(x.chip) + '°C' + (x.throttle ? ' ⚠' : '')], ['净成本 Net cost', x => '£' + fmt(x.cost) + '/h']];
+      $('#v-cmp').innerHTML = `<table><tr><th></th><th>A</th><th>B 当前</th></tr>${rows.map(([n, f]) => `<tr><th>${n}</th><td>${A ? f(A) : '—'}</td><td><b>${f(B)}</b></td></tr>`).join('')}</table>`;
+    },
+  }),
+
+  recap: () => {
+    const r = sim(), m = { reuse: '回收最多热量', cost: '成本最低', safe: 'GPU 最安全' }[state.mission] || '—';
+    return {
+      html: ['① 电几乎全部变成热<br/><span class="en">Almost all electricity becomes heat</span>', '② 热靠水来搬<br/><span class="en">Water moves the heat</span>', '③ 温度决定热能用在哪里<br/><span class="en">Temperature decides where heat is useful</span>']
+        .map(x => `<div class="card"><b>${x}</b></div>`).join('') +
+        `<div class="card">你的目标 Your goal: <b>${m}</b><br/>回收率 Recovery <b>${fmt(r.recoveryPct * 100)}%</b> · 可利用热 <b>${fmt(r.usable)} kW</b> · 芯片 <b class="${r.throttle ? 'bad' : ''}">${fmt(r.chip)}°C</b></div>
+        <button class="cta" id="w-restart">重新开始 Restart</button><button class="cta ghost" id="w-console">回到控制台 Back to console</button>`,
+      bind: () => { $('#w-restart').onclick = () => { Object.assign(state, { guess: null, mission: null, planA: null, sent: {}, checks: {}, hp: false, load: 0.9, supply: 35, flow: 0.6, season: 'winter', cooling: true }); state.pinsSeen.clear(); pinObjs.forEach(o => o.element.classList.remove('seen')); go(0); };
+        $('#w-console').onclick = () => go(SCREENS.findIndex(s => s.id === 'S6.2')); },
+    };
+  },
+};
+
+function consoleHTML(compact) {
+  return `<div class="row">GPU 负载 Load <b id="v-load"></b></div><input type="range" id="i-load" min="0.3" max="1" step="0.01" value="${state.load}">
+    <div class="row">冷却供水温度 Supply temp <b id="v-sup"></b></div><input type="range" id="i-sup" min="25" max="40" step="0.5" value="${state.supply}">
+    <div class="row">季节 Season</div><div class="seg">${Object.entries(SEASON).map(([k, s]) => `<button data-season="${k}" class="${state.season === k ? 'on' : ''}">${s.zh} ${s.en}</button>`).join('')}</div>
+    ${compact ? '' : `<div class="row">热泵 Heat pump</div><div class="seg"><button data-hp="1" class="${state.hp ? 'on' : ''}">开 On</button><button data-hp="0" class="${state.hp ? '' : 'on'}">关 Off</button></div>`}
+    <div class="card" id="v-users"></div>`;
+}
+function bindConsole() {
+  $('#i-load').oninput = e => { state.load = +e.target.value; applyScene(); updateLive(); };
+  $('#i-sup').oninput = e => { state.supply = +e.target.value; applyScene(); updateLive(); };
+  document.querySelectorAll('[data-season]').forEach(b => b.onclick = () => { state.season = b.dataset.season; applyScene(); renderPanel(); });
+  document.querySelectorAll('[data-hp]').forEach(b => b.onclick = () => { state.hp = b.dataset.hp === '1'; applyScene(); renderPanel(); });
+}
+function liveConsole(r) {
+  $('#v-load').textContent = fmt(state.load * 100) + '%';
+  $('#v-sup').textContent = fmt(state.supply, 1) + '°C' + (state.supply < 30 ? '（需要制冷机 chiller on）' : '');
+  const modeTxt = { direct: '<span class="ok">√ 直接 direct</span>', hp: '<span class="warn">↑ 热泵 via HP</span>', none: '<span class="bad">× 无法供热</span>' };
+  $('#v-users').innerHTML = `<div class="row" style="margin-bottom:4px">二次侧 Secondary <b>${fmt(r.T2)}°C</b></div>` +
+    USERS.map(u => `<div class="row"><span>${u.zh} (${u.need}°C)</span><span>${modeTxt[r.served[u.k].mode]} ${fmt(r.served[u.k].frac * 100)}%</span></div>`).join('');
+}
+function liveScore(r) {
+  const el = $('#v-score'); if (!el) return;
+  const goals = {
+    reuse: [r.recoveryPct >= 0.75, `回收率 ${fmt(r.recoveryPct * 100)}%（目标 ≥ 75%）`, '试试冬季 + 开热泵 + 提高供水温度'],
+    cost: [r.cost <= 150, `净成本 £${fmt(r.cost)}/h（目标 ≤ £150/h）`, '试试降低负载或提高供水温度，避免开制冷机'],
+    safe: [r.chip <= 64, `芯片 ${fmt(r.chip)}°C（目标 ≤ 64°C）`, '试试降低供水温度 —— 但看看回收率会怎样'],
+  };
+  const g = goals[state.mission]; if (!g) { el.innerHTML = '<span class="en">在 S6.1 选择一个目标后会显示得分。</span>'; return; }
+  el.innerHTML = `${g[0] ? '<span class="ok verdict">✓ 达成</span>' : '<span class="warn verdict">未达成</span>'} · ${g[1]}<br/><span class="en">${g[0] ? '再看看其他指标付出了什么代价？What did the other metrics pay for it?' : g[2]}</span>`;
+}
+
+let currentLive = null;
+function updateLive() { const r = sim(); if (currentLive) currentLive(r); renderMetrics(); }
+
+function renderPanel() {
+  const sc = SCREENS[state.i], [n, en] = STEPS[sc.step];
+  const w = sc.w ? W[sc.w]() : { html: '' };
+  let checkHTML = '';
+  if (sc.check) {
+    const ans = state.checks[sc.id];
+    checkHTML = `<div class="check">检查点 Checkpoint · ${sc.check.q}</div>` + sc.check.opts.map((o, k) => {
+      const cls = ans === undefined ? '' : k === sc.check.a ? 'right' : k === ans ? 'wrong' : '';
+      return `<button class="opt ${cls}" data-c="${k}">${o}</button>`;
+    }).join('');
+  }
+  $('#panel-body').innerHTML = `<div class="tag">STEP ${n} · ${en} &nbsp; ${sc.id}</div><h1>${sc.title}</h1><div class="en">${sc.en}</div>
+    ${sc.body ? `<div class="body">${sc.body}</div>` : ''}${w.html}
+    ${sc.learn ? `<div class="learn">用户学到 · ${sc.learn}</div>` : ''}${checkHTML}`;
+  w.bind && w.bind();
+  document.querySelectorAll('.opt[data-c]').forEach(b => b.onclick = () => { state.checks[sc.id] = +b.dataset.c; renderPanel(); });
+  currentLive = w.live || null;
+  // nav
+  let blocked = false;
+  if (sc.gate === 'pins') blocked = state.pinsSeen.size < 4;
+  if (sc.gate === 'mission') blocked = !state.mission;
+  if (sc.id === 'S0.2') blocked = !state.guess;
+  $('#next').disabled = blocked || state.i === SCREENS.length - 1;
+  $('#next').textContent = sc.auto ? '自动播放中… Auto ▶' : state.i === SCREENS.length - 1 ? '完成 Done' : '下一步 Next →';
+  $('#back').disabled = state.i === 0; $('#back').style.visibility = state.i === 0 ? 'hidden' : 'visible';
+  updateLive();
+}
+
+let autoTimer;
+function go(i) {
+  i = THREE.MathUtils.clamp(i, 0, SCREENS.length - 1);
+  const prevCam = SCREENS[state.i].cam;
+  state.i = i; const sc = SCREENS[i];
+  state.maxStep = Math.max(state.maxStep, sc.step);
+  if (sc.hp !== undefined) state.hp = sc.hp;
+  if (sc.step !== 2) { state.cooling = true; state.chipOverride = 70; }
+  if (sc.packet === undefined) packetT = packetTarget = 0;
+  if (sc.cam !== prevCam || i === 0) flyTo(sc.cam);
+  applyScene(); renderProgress(); renderPanel();
+  clearTimeout(autoTimer);
+  if (sc.auto) autoTimer = setTimeout(() => { if (state.i === i) go(i + 1); }, sc.auto);
+  history.replaceState(null, '', '#' + sc.id);
+}
+
+$('#next').onclick = () => go(state.i + 1);
+$('#back').onclick = () => go(state.i - 1);
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight' && !$('#next').disabled) go(state.i + 1);
+  if (e.key === 'ArrowLeft') go(state.i - 1);
+});
+
+// deep link: #S4.3 jumps straight to a screen (handy for reviews)
+const start = Math.max(0, SCREENS.findIndex(s => '#' + s.id === location.hash));
+if (start > 0) state.maxStep = SCREENS[start].step;
+resize(); go(start); frame();
+</script>
+</body>
+</html>
