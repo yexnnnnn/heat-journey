@@ -45,8 +45,7 @@
 
   /* ───────── AUDIENCE ───────── */
   .acard { position:fixed; z-index:10; background:var(--a-card); backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,.7); border-radius:16px; box-shadow:0 18px 50px -22px rgba(10,30,45,.45); }
-  #a-left { top:72px; left:18px; width:372px; max-height:calc(100vh - 168px); overflow:auto; padding:18px 20px 16px; }
-  #a-right { top:72px; right:18px; width:340px; max-height:calc(100vh - 168px); overflow:auto; padding:14px; }
+  #a-left { top:72px; left:18px; width:410px; max-height:calc(100vh - 168px); overflow:auto; padding:18px 20px 16px; }
   .eyebrow { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--a-accent); font-weight:700; display:flex; gap:8px; align-items:center; }
   .eyebrow::after { content:""; flex:1; height:1px; background:var(--a-hair); }
   #a-left h1 { font-size:24px; line-height:1.2; margin:10px 0 6px; letter-spacing:-.01em; }
@@ -96,6 +95,35 @@
   .cmp td, .cmp th { padding:5px 4px; border-bottom:1px solid var(--a-hair); text-align:right; font-variant-numeric:tabular-nums; }
   .cmp th { color:var(--a-sub); font-weight:500; } .cmp td:first-child, .cmp th:first-child { text-align:left; color:#3c4a56; }
 
+
+  /* simple-mode components */
+  .happen { margin-top:12px; border-radius:12px; background:#eef6f8; color:#0d4f59; padding:11px 13px; font-size:13.5px; line-height:1.5; }
+  .happen .hd { font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; font-weight:800; color:#0f7b8a; margin-bottom:4px; }
+  .happen p { margin:0 0 5px; } .happen p:last-child { margin:0; }
+  .happen.bad { background:#fbeceb; color:#7a1f18; } .happen.bad .hd { color:var(--bad); }
+  .happen.good { background:#e9f7f0; color:#155c3b; } .happen.good .hd { color:var(--good); }
+  .diagram { width:100%; display:block; background:#fff; border:1px solid var(--a-hair); border-radius:12px; margin-top:8px; }
+  .diagram text { font-family:inherit; }
+  .stops { counter-reset:s; margin-top:8px; }
+  .stop { display:flex; gap:10px; padding:8px 10px; border-radius:10px; border:1px solid transparent; cursor:pointer; font-size:13px; line-height:1.45; color:#5b6976; }
+  .stop .n { width:22px; height:22px; border-radius:50%; background:#e3e9ee; color:#5b6976; font-weight:800; font-size:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .stop.on { background:#fff; border-color:var(--a-accent); color:var(--a-ink); box-shadow:0 4px 14px -8px rgba(0,0,0,.3); }
+  .stop.on .n { background:var(--a-accent); color:#fff; }
+  .stop b { color:var(--a-ink); }
+  .facs { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:8px; }
+  .facs button { text-align:left; border:1px solid var(--a-hair); background:#fff; border-radius:12px; padding:10px; cursor:pointer; font-size:12.5px; color:var(--a-sub); }
+  .facs button b { display:block; color:var(--a-ink); font-size:13.5px; margin-bottom:2px; }
+  .facs button.on { border-color:var(--a-accent); background:#e6f4f6; }
+  .facinfo { margin-top:10px; background:#fff; border:1px solid var(--a-hair); border-radius:12px; padding:12px 13px; font-size:13px; line-height:1.5; }
+  .facinfo h3 { margin:0 0 6px; font-size:15px; }
+  .facinfo ul { margin:6px 0 8px; padding-left:18px; } .facinfo li { margin:2px 0; }
+  .temps { display:flex; gap:8px; margin:8px 0 4px; }
+  .temps div { flex:1; border-radius:10px; padding:7px 9px; font-size:11.5px; color:#fff; }
+  .temps b { display:block; font-size:17px; }
+  .note { font-size:12px; color:var(--a-sub); margin-top:6px; line-height:1.45; }
+  .verdict { display:inline-block; font-weight:800; font-size:12.5px; padding:4px 10px; border-radius:999px; margin-top:8px; }
+  .verdict.good { background:#dcf2e7; color:var(--good); } .verdict.bad { background:#f8dedb; color:var(--bad); } .verdict.warn { background:#f8ecd2; color:#9a6a0b; }
+  .xhelp { font-size:11px; color:#7f97ab; margin:-4px 0 8px; line-height:1.4; }
   .tiles { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .tile { background:#fff; border:1px solid var(--a-hair); border-radius:12px; padding:10px 11px; transition:opacity .4s, border-color .3s; }
   .tile .k { font-size:11px; color:var(--a-sub); }
@@ -129,7 +157,7 @@
   #segs i { display:block; height:5px; border-radius:3px; background:var(--a-hair); }
   #segs span { display:block; font-size:10.5px; color:#8a97a3; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #segs .done i { background:#8cc7cf; } #segs .now i { background:var(--a-accent); } #segs .now span { color:var(--a-ink); font-weight:700; }
-  #legend { position:fixed; z-index:9; left:18px; bottom:16px; width:200px; padding:9px 12px; font-size:11px; color:var(--a-sub); }
+  #legend { position:fixed; z-index:9; right:18px; top:72px; width:220px; padding:9px 12px; font-size:11px; color:var(--a-sub); }
   #legend .g { height:9px; border-radius:5px; margin:5px 0 3px; background:linear-gradient(90deg,#2f7bff,#22c3d6,#f2c14e,#ff8a3d,#ff3b3b); }
   #legend .e { display:flex; justify-content:space-between; }
   #toasts { position:fixed; z-index:30; top:66px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; gap:6px; align-items:center; pointer-events:none; }
@@ -173,8 +201,8 @@
   #x-time { position:fixed; z-index:10; bottom:14px; left:296px; right:346px; background:var(--x-panel); border:1px solid var(--x-line); border-radius:9px; padding:8px 12px; display:flex; align-items:center; gap:12px; color:var(--x-ink); font-size:12px; }
   #x-time input { flex:1; } #x-time .xbtn { background:#1b84b5; border-color:#1b84b5; font-weight:700; padding:6px 14px; }
   #fatal { position:fixed; inset:0; z-index:99; display:none; align-items:center; justify-content:center; text-align:center; padding:40px; background:#eef3f6; color:#14202b; line-height:1.8; }
-  @media (max-width: 1100px) { .chips, .disclaimer { display:none; } #a-right { width:300px; } #a-left { width:330px; } }
-  @media (max-width: 820px) { #a-right { top:auto; bottom:84px; left:18px; right:18px; width:auto; max-height:34vh; } #a-left { max-height:40vh; width:calc(100vw - 36px); } #legend { display:none !important; } }
+  @media (max-width: 1100px) { .chips, .disclaimer { display:none; } #a-left { width:370px; } }
+  @media (max-width: 820px) { #a-left { max-height:46vh; width:calc(100vw - 36px); } #legend { display:none !important; } }
 </style>
 <script type="importmap">
 { "imports": {
@@ -188,7 +216,7 @@
 
 <header>
   <div class="brand"><b>ThermalLoop AI Center</b><span id="brand-sub">Audience Mode · guided tour</span></div>
-  <div class="chips"><span>1:1 SI metres</span><span>6 floors · 36 GPU racks</span><span>simplified_physics</span></div>
+  <div class="chips"><span>6 floors · 36 GPU racks</span><span>4 heated facilities</span><span>simplified model</span></div>
   <div class="modesw"><button data-mode="audience" class="on">Audience</button><button data-mode="expert">Expert</button></div>
   <div class="disclaimer">Deterministic simplified model. Not calibrated and not measured data.</div>
 </header>
@@ -200,20 +228,12 @@
   <p class="lede" id="a-lede"></p>
   <div id="a-controls"></div>
 </section>
-<aside id="a-right" class="acard audience-only">
-  <div class="sec" style="margin-top:2px">Live readouts</div>
-  <div class="tiles" id="a-tiles"></div>
-  <div class="sec">What just changed</div>
-  <div class="changes" id="a-changes"></div>
-  <div class="sec">Consequences triggered</div>
-  <div id="a-trigs"></div>
-</aside>
 <nav id="a-steps" class="acard audience-only">
   <button class="nav" id="a-prev">← Back</button>
   <div id="segs"></div>
   <button class="nav pri" id="a-next">Next →</button>
 </nav>
-<div id="legend" class="acard audience-only">Water temperature<div class="g"></div><div class="e"><span>15°C</span><span>40°C</span><span>65°C</span></div></div>
+<div id="legend" class="acard audience-only"><b style="color:#14202b">Pipe colours = water temperature</b><div class="g"></div><div class="e"><span>cool 15°C</span><span>40°C</span><span>hot 65°C</span></div><div style="margin-top:4px">Moving dots show which way water flows.</div></div>
 <div id="toasts"></div>
 
 <!-- EXPERT -->
