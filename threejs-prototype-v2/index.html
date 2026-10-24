@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Heat Journey — where AI's heat goes</title>
+<style>
+  /* ── SEED-inspired: warm, light, generous whitespace, soft floating cards ── */
+  :root {
+    --bg:#EDEBE3; --ink:#1C2321; --sub:#5E6762; --hair:#D7D3C8;
+    --card:rgba(255,255,255,.82); --glass:rgba(255,255,255,.65);
+    --green:#2E5E3A; --green-ink:#1c3d25; --accent:#C8623A;
+    --warm:#E8A33D; --cool:#3E7CB1; --bad:#C0472B; --ok:#3E8E5A;
+    --r:18px; --shadow:0 18px 50px -24px rgba(20,25,22,.45);
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; overflow:hidden;
+    font-family:"Inter",ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    color:var(--ink); background:var(--bg); -webkit-font-smoothing:antialiased; }
+  #scene-canvas { position:fixed; inset:0; display:block; }
+  #labels { position:fixed; inset:0; pointer-events:none; z-index:2; }
+
+  /* top bar */
+  header { position:fixed; top:0; left:0; right:0; height:64px; z-index:5;
+    display:flex; align-items:center; gap:18px; padding:0 26px;
+    background:linear-gradient(var(--bg), rgba(237,235,227,0)); }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.02em; }
+  .brand .dot { width:20px; height:20px; border-radius:50%;
+    background:conic-gradient(from 210deg, var(--accent), var(--warm), var(--green)); }
+  .brand small { font-weight:500; color:var(--sub); border-left:1px solid var(--hair); padding-left:12px; letter-spacing:.06em; font-size:11px; text-transform:uppercase; }
+  .top-actions { margin-left:auto; display:flex; gap:8px; }
+  .pill { border:1px solid var(--hair); background:var(--glass); backdrop-filter:blur(8px);
+    border-radius:999px; padding:8px 14px; font-size:13px; color:var(--ink); cursor:pointer; display:flex; align-items:center; gap:7px; }
+  .pill:hover { border-color:var(--sub); }
+  .pill.icon { width:38px; height:38px; justify-content:center; padding:0; }
+
+  /* left narrative card */
+  #card { position:fixed; top:84px; left:26px; width:min(380px,calc(100vw - 52px)); z-index:4;
+    background:var(--card); backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,.6);
+    border-radius:var(--r); box-shadow:var(--shadow); overflow:hidden;
+    border-left:4px solid var(--green); }
+  #card .pad { padding:20px 22px 16px; }
+  .eyebrow { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--green); font-weight:700; display:flex; align-items:center; gap:8px; }
+  .eyebrow::after { content:""; flex:1; height:1px; background:var(--hair); }
+  h1 { font-size:26px; line-height:1.18; margin:12px 0 4px; letter-spacing:-.01em; font-weight:800; }
+  .lede { font-size:14.5px; line-height:1.55; color:#36403b; margin:8px 0 2px; }
+  .lede b { color:var(--ink); }
+
+  /* tabs (SEED-style) */
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin:14px 0 4px; }
+  .tab { font-size:12.5px; padding:6px 12px; border-radius:999px; border:1px solid var(--hair);
+    background:#fff; color:var(--sub); cursor:pointer; }
+  .tab.on { background:var(--green); color:#fff; border-color:var(--green); font-weight:600; }
+
+  .panel { padding:0 22px 8px; }
+  .big-stat { font-size:40px; font-weight:800; letter-spacing:-.02em; margin:4px 0 2px; }
+  .big-stat .u { font-size:17px; color:var(--sub); font-weight:600; margin-left:4px; }
+  .foot-note { font-size:11px; color:var(--sub); border-top:1px solid var(--hair); padding:10px 22px 16px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+
+  /* interactive bits */
+  .ctl { margin:12px 0; }
+  .ctl .row { display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px; color:var(--sub); margin-bottom:2px; }
+  .ctl .row b { color:var(--ink); font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; }
+  input[type=range] { -webkit-appearance:none; width:100%; height:26px; background:transparent; cursor:pointer; }
+  input[type=range]::-webkit-slider-runnable-track { height:6px; border-radius:3px; background:linear-gradient(90deg, var(--cool), var(--warm), var(--bad)); }
+  input[type=range]::-moz-range-track { height:6px; border-radius:3px; background:linear-gradient(90deg, var(--cool), var(--warm), var(--bad)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:#fff; border:2px solid var(--green); margin-top:-7px; box-shadow:0 2px 6px rgba(0,0,0,.2); }
+  input[type=range]::-moz-range-thumb { width:18px; height:18px; border-radius:50%; background:#fff; border:2px solid var(--green); box-shadow:0 2px 6px rgba(0,0,0,.2); }
+  input[type=range]:disabled { opacity:.45; cursor:default; }
+  .seg { display:flex; gap:6px; }
+  .seg button { flex:1; font:inherit; font-size:12.5px; padding:7px; border-radius:10px; border:1px solid var(--hair); background:#fff; color:var(--sub); cursor:pointer; }
+  .seg button.on { border-color:var(--green); background:var(--green); color:#fff; font-weight:600; }
+  .btn { width:100%; border:0; border-radius:12px; padding:12px; font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  .btn.primary { background:var(--green); color:#fff; }
+  .btn.ghost { background:#fff; border:1px solid var(--hair); color:var(--ink); }
+  .btn.warn { background:#fff; border:1px solid var(--bad); color:var(--bad); }
+  .btn + .btn { margin-top:8px; }
+
+  /* consequence ticker: "change X → Y happens" */
+  .conseq { margin-top:10px; border-radius:12px; background:#fff; border:1px solid var(--hair); overflow:hidden; }
+  .conseq .hd { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--sub); padding:9px 12px 4px; }
+  .conseq .line { display:flex; align-items:center; gap:8px; padding:5px 12px; font-size:13px; }
+  .conseq .line:last-child { padding-bottom:10px; }
+  .conseq .k { color:var(--sub); flex:1; }
+  .conseq .v { font-weight:700; font-variant-numeric:tabular-nums; }
+  .arrow { font-size:12px; }
+  .up { color:var(--bad); } .down { color:var(--ok); } .flat { color:var(--sub); }
+  .chip { font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; }
+  .chip.ok { background:#e2efe6; color:var(--ok); } .chip.warn { background:#f7ead2; color:#9a6b12; } .chip.bad { background:#f6ddd5; color:var(--bad); }
+
+  .insight { margin-top:10px; background:#e9efe6; border-radius:12px; padding:11px 13px; font-size:12.5px; line-height:1.5; color:var(--green-ink); }
+  .insight b { color:var(--green); }
+
+  /* right "see inside" rail (SEED-style view toggles) */
+  #rail { position:fixed; top:84px; right:26px; z-index:4; width:210px;
+    background:var(--card); backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,.6);
+    border-radius:var(--r); box-shadow:var(--shadow); padding:10px; }
+  #rail .hd { font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--sub); padding:4px 8px 8px; }
+  #rail button { width:100%; display:flex; align-items:center; gap:10px; border:0; background:transparent;
+    font:inherit; font-size:13px; color:var(--ink); padding:9px 8px; border-radius:10px; cursor:pointer; text-align:left; }
+  #rail button:hover { background:rgba(0,0,0,.04); }
+  #rail button.on { background:var(--green); color:#fff; }
+  #rail button .sw { width:16px; height:16px; border-radius:4px; border:1.5px solid currentColor; opacity:.6; flex-shrink:0; }
+  #rail button.on .sw { background:#fff; opacity:1; border-color:#fff; }
+
+  /* bottom tour bar (SEED-style) */
+  #tour { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); z-index:5;
+    display:flex; align-items:center; gap:16px; padding:12px 16px; width:min(760px, calc(100vw - 40px));
+    background:var(--card); backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,.6);
+    border-radius:16px; box-shadow:var(--shadow); }
+  #tour .navbtn { border:1px solid var(--hair); background:#fff; border-radius:10px; padding:9px 13px; font:inherit; font-size:13px; cursor:pointer; white-space:nowrap; }
+  #tour .navbtn:disabled { opacity:.4; cursor:default; }
+  #tour .navbtn.primary { background:var(--green); color:#fff; border-color:var(--green); font-weight:700; }
+  #steps { flex:1; }
+  #steps .label { font-size:11px; color:var(--sub); margin-bottom:6px; display:flex; justify-content:space-between; }
+  #dots { display:flex; gap:5px; }
+  #dots .d { flex:1; height:5px; border-radius:3px; background:var(--hair); cursor:pointer; transition:.2s; }
+  #dots .d.done { background:#aebcaf; } #dots .d.now { background:var(--green); }
+
+  #legend { position:fixed; left:26px; bottom:20px; z-index:4; background:var(--glass); backdrop-filter:blur(8px);
+    border:1px solid var(--hair); border-radius:12px; padding:9px 12px; font-size:11px; color:var(--sub); width:200px; }
+  #legend .grad { height:10px; border-radius:5px; margin:5px 0 3px; background:linear-gradient(90deg,#3E7CB1,#49A3A3,#E8A33D,#E07B39,#C0472B); }
+  #legend .ends { display:flex; justify-content:space-between; }
+
+  .hint { position:fixed; right:26px; bottom:20px; z-index:4; font-size:11px; color:var(--sub); background:var(--glass); backdrop-filter:blur(8px); border:1px solid var(--hair); border-radius:999px; padding:7px 13px; }
+
+  /* 3D hotspot labels */
+  .lbl { pointer-events:auto; cursor:pointer; background:var(--card); backdrop-filter:blur(8px); border:1px solid var(--hair);
+    border-radius:999px; padding:5px 11px; font-size:12px; font-weight:600; color:var(--ink); box-shadow:var(--shadow); white-space:nowrap; transform:translate(-50%,-50%); transition:opacity .3s; }
+  .lbl .mk { color:var(--accent); }
+  .lbl.quiet { background:transparent; border-color:transparent; box-shadow:none; font-weight:500; color:#49524d; }
+
+  #fatal { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; text-align:center; padding:40px; background:var(--bg); line-height:1.8; }
+  @media (max-width:880px){ #rail{display:none} #card{width:calc(100vw - 52px)} }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="scene-canvas"></canvas>
+<div id="labels"></div>
+
+<header>
+  <div class="brand"><span class="dot"></span>HEAT JOURNEY <small>AI data center · waste heat</small></div>
+  <div class="top-actions">
+    <button class="pill" id="btn-restart">↺ Restart tour</button>
+    <button class="pill icon" id="btn-help" title="Controls">?</button>
+  </div>
+</header>
+
+<section id="card">
+  <div class="pad">
+    <div class="eyebrow" id="eyebrow">THE IDEA</div>
+    <h1 id="title">—</h1>
+    <div class="tabs" id="tabs"></div>
+    <div class="lede" id="lede"></div>
+  </div>
+  <div class="panel" id="panel"></div>
+  <div class="foot-note"><span id="foot">—</span></div>
+</section>
+
+<aside id="rail">
+  <div class="hd">See inside</div>
+  <div id="rail-btns"></div>
+</aside>
+
+<div id="legend">Water temperature<div class="grad"></div><div class="ends"><span>20°C</span><span>45°C</span><span>70°C</span></div></div>
+<div class="hint">Drag to orbit · scroll to zoom</div>
+
+<nav id="tour">
+  <button class="navbtn" id="prev">← Back</button>
+  <div id="steps"><div class="label"><span id="step-name">The idea</span><span id="step-count">01 / 07</span></div><div id="dots"></div></div>
+  <button class="navbtn primary" id="next">Begin tour →</button>
+</nav>
+
+<div id="fatal">Couldn't load three.js — this prototype needs an internet connection (it loads from the jsDelivr CDN).<br/>Open it on a networked device, or run a local server.</div>
+
+<script>
+  window.addEventListener('error', e => { if (String(e.message||'').match(/import|module|fetch|dynamically/i)) document.getElementById('fatal').style.display='flex'; }, true);
+  setTimeout(()=>{ if(!window.__READY) document.getElementById('fatal').style.display='flex'; }, 12000);
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+window.__READY = true;
+const { MathUtils } = THREE;
+const clamp = MathUtils.clamp, lerp = MathUtils.lerp;
+
+/* ════════════════ 1. Illustrative simulation model ════════════════ */
+const SEASON = { summer:{lab:10,gh:60,dist:150,label:'Summer'}, spring:{lab:25,gh:180,dist:350,label:'Spring / Autumn'}, winter:{lab:40,gh:300,dist:500,label:'Winter'} };
+const USERS = [ {k:'lab',name:'Robot lab',need:35}, {k:'gh',name:'Greenhouse',need:45}, {k:'dist',name:'District heating',need:65} ];
+const PRICE_E = 0.20, PRICE_H = 0.07;
+function simulate(s){
+  const P = 1000*s.load;
+  const Q = P;                                   // ~100% of electricity -> heat
+  const dT = 10*s.load*(0.6/s.flow);
+  const Tr = s.supply + dT;
+  const chip = s.cooling ? s.supply + dT + 22*s.load + 3 : s.chipRunaway;
+  const T2 = Tr - 3;
+  const COP = clamp(0.42*(65+273)/Math.max(65-T2+8,6), 1.5, 7);
+  const D = SEASON[s.season];
+  let avail = 0.8*Q, direct=0, hpSrc=0, hpDel=0, hpElec=0; const served={};
+  for(const u of USERS) if(T2>=u.need){ const take=Math.min(D[u.k],avail); avail-=take; direct+=take; served[u.k]={mode:'direct',frac:take/D[u.k]}; }
+  for(const u of USERS) if(T2<u.need){ if(!s.hp){served[u.k]={mode:'none',frac:0}; continue;}
+    const src=Math.min(D[u.k]*(1-1/COP),avail); avail-=src; const del=src/(1-1/COP);
+    hpSrc+=src; hpDel+=del; hpElec+=del/COP; served[u.k]={mode:'hp',frac:del/D[u.k]}; }
+  const recovered=direct+hpSrc, rejected=Math.max(Q-recovered,0);
+  const chiller = s.supply<30 ? 0.03+(30-s.supply)*0.025 : 0.03;
+  const coolingElec = Q*0.02 + rejected*chiller;
+  const total = P + coolingElec + hpElec;
+  const usable = direct + hpDel;
+  const cost = total*PRICE_E - usable*PRICE_H;
+  return {P,Q,Tr,chip,T2,COP,direct,hpDel,hpElec,recovered,rejected,usable,coolingElec,total,cost,
+    recoveryPct:recovered/Q, served, throttle:chip>85, chillerOn:s.supply<30};
+}
+
+/* ════════════════ 2. State ════════════════ */
+const state = {
+  i:0, maxStep:0, tab:0, planA:null,
+  load:0.9, supply:35, flow:0.6, season:'winter', hp:false, cooling:true, chipRunaway:70,
+  hour:22, views:{ xray:false, cutaway:true, boreheat:false, labels:true },
+};
+const sim = () => simulate(state);
+
+/* ════════════════ 3. Three.js setup ════════════════ */
+const canvas = document.getElementById('scene-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const labelRenderer = new CSS2DRenderer({ element: document.getElementById('labels') });
+
+const scene = new THREE.Scene();
+const BG_DAY = new THREE.Color('#EDEBE3'); scene.background = BG_DAY.clone();
+scene.fog = new THREE.Fog(BG_DAY.clone(), 34, 70);
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+camera.position.set(14,11,22);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.target.set(2,0,0);
+controls.minDistance=6; controls.maxDistance=48; controls.maxPolarAngle=Math.PI*0.49;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x9a9684, 1.15));
+const sun = new THREE.DirectionalLight(0xfff2dd, 2.0); sun.position.set(-12,18,10); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048); Object.assign(sun.shadow.camera,{left:-26,right:26,top:20,bottom:-14,near:1,far:60}); sun.shadow.camera.updateProjectionMatrix();
+sun.shadow.bias=-0.0003; scene.add(sun);
+const plantGlow = new THREE.PointLight(0xffd9a0, 0, 16); plantGlow.position.set(2,-2.4,4); scene.add(plantGlow);
+
+// temperature -> color
+const STOPS = [[20,'#3E7CB1'],[32,'#49A3A3'],[42,'#E8A33D'],[55,'#E07B39'],[70,'#C0472B']].map(([t,c])=>[t,new THREE.Color(c)]);
+function tcol(t){ if(t<=STOPS[0][0])return STOPS[0][1].clone();
+  for(let k=1;k<STOPS.length;k++) if(t<=STOPS[k][0]){ const[t0,c0]=STOPS[k-1],[t1,c1]=STOPS[k]; return c0.clone().lerp(c1,(t-t0)/(t1-t0)); }
+  return STOPS.at(-1)[1].clone(); }
+const GRAY = new THREE.Color('#9b9a8f');
+
+const units = {};
+function unit(n){ const g=new THREE.Group(); g.name=n; scene.add(g); units[n]={g,mats:[],dim:1,label:null}; return g; }
+function M(u,geo,color,o={}){ const m=new THREE.MeshStandardMaterial({color,roughness:o.rough??0.75,metalness:o.metal??0.05,transparent:true,opacity:o.opacity??1,emissive:o.emissive??0x000000,emissiveIntensity:o.ei??1}); m.userData.base=m.opacity; const me=new THREE.Mesh(geo,m); me.castShadow=!o.noShadow; me.receiveShadow=true; if(o.pos)me.position.set(...o.pos); if(o.rot)me.rotation.set(...o.rot); units[u].g.add(me); units[u].mats.push(m); return me; }
+const B=(w,h,d)=>new THREE.BoxGeometry(w,h,d);
+function label(u,text,pos,quiet){ const el=document.createElement('div'); el.className='lbl'+(quiet?' quiet':''); el.innerHTML=text; const o=new CSS2DObject(el); o.position.set(...pos); units[u].g.add(o); units[u].label=el; return el; }
+
+/* ground + cutaway */
+const envMats=[];
+function envMat(c,o=1){ const m=new THREE.MeshStandardMaterial({color:c,roughness:.97,transparent:true,opacity:o}); m.userData.base=o; envMats.push(m); return m; }
+const meadowMat = envMat('#9FB870');
+const meadow = new THREE.Mesh(B(44,0.3,30), meadowMat); meadow.position.set(6,-0.15,-2); meadow.receiveShadow=true; scene.add(meadow);
+const soilMat = envMat('#6f5f49'), soilFloorMat = envMat('#5a4c39');
+const soilBack = new THREE.Mesh(B(44,6,0.4), soilMat); soilBack.position.set(6,-3.3,-16.8); scene.add(soilBack);
+const soilFloor = new THREE.Mesh(B(44,0.3,30), soilFloorMat); soilFloor.position.set(6,-6.3,-2); scene.add(soilFloor);
+const cutStrip = new THREE.Mesh(B(44,0.08,0.08), new THREE.MeshBasicMaterial({color:'#efeadd'})); cutStrip.position.set(6,-0.02,13); scene.add(cutStrip);
+
+/* ── data center (solar-roofed low building, SEED vibe) ── */
+unit('DataCenter');
+M('DataCenter', B(9,0.25,5), '#c9c6ba', {pos:[-3,0.12,0]});
+const dcShell = M('DataCenter', B(9,3.2,5), '#e7e3d7', {pos:[-3,1.7,0]});
+M('DataCenter', B(9.1,0.18,5.1), '#20324a', {pos:[-3,3.35,0], metal:.3, rough:.35}); // solar roof
+for(let r=0;r<4;r++) for(let c=0;c<7;c++) M('DataCenter', B(1.0,0.02,0.52), '#2b4c74', {pos:[-6.6+c*1.1,3.45,-1.7+r*1.15], metal:.4, rough:.3, noShadow:true});
+label('DataCenter','Data center · 6 halls',[-3,4.0,0]);
+
+const RACK_X=[-6.2,-4.6,-3.0,-1.4,0.2]; const gpuMats=[];
+RACK_X.forEach((x,i)=>{ const n='Rack'+(i+1); unit(n);
+  M(n,B(1.0,2.3,1.5),'#30343a',{pos:[x,1.35,0],metal:.5,rough:.4});
+  for(let k=0;k<6;k++){ const m=M(n,B(0.82,0.16,0.04),'#3a3f45',{pos:[x,0.5+k*0.32,0.77],emissive:'#000'}); gpuMats.push({mat:m.material,rack:i,k}); } });
+units.Rack3.g.children[0].userData.rack=true;
+
+/* ── rooftop dry cooler ── */
+unit('DryCooler');
+M('DryCooler',B(2.2,0.5,1.5),'#b9b6a9',{pos:[0.4,3.7,0],metal:.3});
+const fans=[]; for(let k=0;k<3;k++) fans.push(M('DryCooler',B(0.55,0.06,0.09),'#4b4f54',{pos:[-0.3+k*0.7,3.98,0]}));
+label('DryCooler','Dry cooler (rejects unused heat)',[0.4,4.5,0],true);
+
+/* ── greenhouse ── */
+unit('Greenhouse');
+M('Greenhouse',B(4,1.7,3.2),'#cfe6d2',{pos:[7,0.85,-0.2],opacity:.4,rough:.1,noShadow:true});
+const ghRoofGeo=new THREE.CylinderGeometry(1.4,1.4,4,3,1); const ghRoof=M('Greenhouse',ghRoofGeo,'#dff0e0',{pos:[7,2.05,-0.2],opacity:.45,rough:.1,noShadow:true}); ghRoof.rotation.x=-Math.PI/2; ghRoof.scale.set(1,1.4,0.6);
+for(let k=0;k<9;k++) M('Greenhouse',new THREE.SphereGeometry(0.24,12,8),'#4f9d55',{pos:[5.5+(k%3)*1,0.28,-1.1+Math.floor(k/3)*0.9]});
+label('Greenhouse','Greenhouse · needs 45°C',[7,3.0,-0.2]);
+
+/* ── robot lab ── */
+unit('RobotLab');
+M('RobotLab',B(2.4,2,2.6),'#d8cfe8',{pos:[10.6,1,-0.6],opacity:.92});
+M('RobotLab',new THREE.CylinderGeometry(0.3,0.42,0.8,16),'#7a56c6',{pos:[10.6,0.4,0.8]});
+M('RobotLab',new THREE.SphereGeometry(0.26,16,12),'#a98fe0',{pos:[10.6,1,0.8]});
+label('RobotLab','Robot lab · needs 35°C',[10.6,2.5,-0.4]);
+
+/* ── district houses ── */
+unit('District');
+for(let k=0;k<3;k++){ const x=13.4+k*1.4; M('District',B(1,1,1.2),'#e9d2ac',{pos:[x,0.5,-0.6]}); const r=M('District',new THREE.ConeGeometry(0.9,0.6,4),'#b5651d',{pos:[x,1.3,-0.6]}); r.rotation.y=Math.PI/4; }
+label('District','District heating · needs 65°C',[14.8,2.0,-0.5]);
+
+/* ── plant room (underground) ── */
+unit('PlantRoom');
+M('PlantRoom',B(19,0.2,5),'#8f8a7b',{pos:[3,-4.3,-0.4]});
+M('PlantRoom',B(19,3.6,0.18),'#7c7768',{pos:[3,-2.5,-2.8]});
+label('PlantRoom','Plant room',[-5.4,-0.9,0.2],true);
+
+unit('Pump'); const pumpBody=M('Pump',new THREE.CylinderGeometry(0.44,0.44,0.72,24),'#5a8fc9',{pos:[-5,-2.9,1.3],metal:.4,rot:[Math.PI/2,0,0]}); const impeller=M('Pump',B(0.72,0.1,0.1),'#2c5a8c',{pos:[-5,-2.9,1.7]}); label('Pump','Pump',[-5,-3.6,1.3],true);
+
+unit('HeatExchanger');
+M('HeatExchanger',B(1.6,1.7,1.7),'#9aa0a6',{pos:[-1.9,-2.9,0.9],opacity:.5,metal:.5,rough:.3});
+const hxPlates=[]; for(let k=0;k<7;k++) hxPlates.push(M('HeatExchanger',B(0.09,1.4,1.4),k%2?'#E8A33D':'#E07B39',{pos:[-2.5+k*0.19,-2.9,0.9],emissive:k%2?'#E8A33D':'#E07B39',ei:.25}));
+label('HeatExchanger','Heat exchanger — passes heat, can\'t add it',[-1.9,-1.7,0.9]);
+
+unit('HeatPump');
+M('HeatPump',B(2.1,1.7,1.7),'#8a9096',{pos:[2.1,-2.9,0.3],metal:.35});
+const compressor=M('HeatPump',new THREE.SphereGeometry(0.46,24,16),'#9b9a8f',{pos:[1.6,-2.9,1.2],emissive:'#000'});
+label('HeatPump','Heat pump — lifts temperature',[2.1,-1.7,0.3]);
+
+unit('Tank');
+M('Tank',new THREE.CylinderGeometry(0.72,0.72,2.8,32),'#b0a89a',{pos:[4.6,-2.8,0],opacity:.5,metal:.3});
+const tankLevel=M('Tank',new THREE.CylinderGeometry(0.64,0.64,1,32),'#E8A33D',{pos:[4.6,-3.5,0],emissive:'#E8A33D',ei:.25});
+label('Tank','Thermal store',[4.6,-1.1,0],true);
+
+/* ── boreholes (SEED "show boreholes") ── */
+unit('Boreholes');
+for(let k=0;k<10;k++){ const x=6+(k%5)*1.3, z=-0.5+Math.floor(k/5)*1.4; M('Boreholes',new THREE.CylinderGeometry(0.08,0.08,5.5,10),'#C0472B',{pos:[x,-3.1,z],emissive:'#C0472B',ei:.3,noShadow:true}); }
+label('Boreholes','Seasonal borehole store',[8.2,-3.4,0.4],true);
+
+/* ── pipes + flow particles ── */
+const PIPES=[
+ {n:'PrimaryHot',set:'primary',r:0.12,z:1.3,pts:[[0.2,2.6],[-6.9,2.6],[-6.9,-2.9],[-2.6,-2.9]]},
+ {n:'PrimaryCold',set:'primary',r:0.12,z:1.3,pts:[[-1.3,-2.3],[-1.3,0.2],[-6.4,0.2]]},
+ {n:'SecondaryHot',set:'secondary',r:0.1,z:0.3,pts:[[-1.2,-2.9],[1.1,-2.9]]},
+ {n:'SecondaryMain',set:'secondary',r:0.1,z:0.3,pts:[[0.2,-2.9],[0.2,-0.9],[10.3,-0.9],[10.3,0.1]]},
+ {n:'ToGreenhouse',set:'secondary',r:0.09,z:0.3,pts:[[6.9,-0.9],[6.9,0.1]]},
+ {n:'ToTank',set:'secondary',r:0.09,z:0.3,pts:[[4.6,-0.9],[4.6,-1.4]]},
+ {n:'Return',set:'secondary',r:0.09,z:-0.6,pts:[[11.6,0.1],[11.6,-4.0],[-1.9,-4.0],[-1.9,-3.7]]},
+ {n:'HeatPumpOut',set:'hp',r:0.1,z:-0.2,pts:[[2.6,-2.1],[2.6,-0.5],[14.6,-0.5],[14.6,0.1]]},
+ {n:'Reject',set:'reject',r:0.09,z:0.3,pts:[[3,-0.9],[3,3.7],[0.4,3.7]]},
+];
+const pipes={}; const pGeo=new THREE.SphereGeometry(0.075,8,6);
+for(const d of PIPES){ unit(d.n); const path=new THREE.CurvePath();
+  for(let k=1;k<d.pts.length;k++) path.add(new THREE.LineCurve3(new THREE.Vector3(d.pts[k-1][0],d.pts[k-1][1],d.z),new THREE.Vector3(d.pts[k][0],d.pts[k][1],d.z)));
+  const tube=M(d.n,new THREE.TubeGeometry(path,64*d.pts.length,d.r,10,false),GRAY,{metal:.2,rough:.4,emissive:'#000'});
+  const len=path.getLength(), count=Math.max(4,Math.round(len*2.2));
+  const pm=new THREE.MeshBasicMaterial({color:'#fff',transparent:true,opacity:.95}); pm.userData.base=.95;
+  const inst=new THREE.InstancedMesh(pGeo,pm,count); inst.frustumCulled=false; units[d.n].g.add(inst); units[d.n].mats.push(pm);
+  pipes[d.n]={d,path,tube,inst,count,len,offset:0,active:false,temp:30,speed:1}; }
+
+/* ════════════════ 4. Camera presets ════════════════ */
+const CAMS = {
+  hero:   {p:[14,11,22], t:[2,0.4,0]},
+  dc:     {p:[-3,5.5,12], t:[-3,1.4,0]},
+  rack:   {p:[-1.2,2.2,5.5], t:[-3,1.3,0]},
+  trace:  {p:[-2,2,18], t:[-3,-0.4,0]},
+  plant:  {p:[2.5,-0.5,13], t:[1,-2.6,0]},
+  hx:     {p:[-1,-1.6,6], t:[-1.9,-2.9,0.6]},
+  users:  {p:[11,4,13], t:[9,0.2,0]},
+  wide:   {p:[12,9,24], t:[4,-0.6,0]},
+};
+let tween=null;
+function flyTo(k){ const c=CAMS[k]; tween={t:0,fromP:camera.position.clone(),fromT:controls.target.clone(),toP:new THREE.Vector3(...c.p),toT:new THREE.Vector3(...c.t)}; }
+const ease=x=>x<0.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+
+/* ════════════════ 5. Tour steps (7 steps, no quiz) ════════════════ */
+// Each step: tabs[] (SEED-style sub-views), each tab = {name, lede, panel widget, cam, focus, applies}
+const F = {
+  DC:['DataCenter','Rack1','Rack2','Rack3','Rack4','Rack5','DryCooler'],
+  PRIMARY:['Rack3','PrimaryHot','PrimaryCold','Pump','HeatExchanger'],
+  PLANT:['PlantRoom','Pump','HeatExchanger','HeatPump','Tank','PrimaryHot','PrimaryCold','SecondaryHot','SecondaryMain','Return','ToTank'],
+  HX:['HeatExchanger','PrimaryHot','PrimaryCold','SecondaryHot','Return','PlantRoom'],
+  USERS:['Greenhouse','RobotLab','District','SecondaryMain','ToGreenhouse','HeatPumpOut','Return','HeatPump','Tank'],
+};
+const STEPS = [
+  { key:'01', name:'The idea', cam:'hero', focus:null,
+    tabs:[
+      { tab:'Overview', title:'Every watt of AI becomes heat.',
+        lede:'This building runs AI servers, cools them with water, and tries to <b>reuse</b> that heat instead of wasting it. Drag to look around — then take the tour.',
+        w:'overview' },
+      { tab:'The system', title:'One system, four parts.', cam:'wide',
+        lede:'Compute makes heat · the plant room moves and upgrades it · heat users consume it · the dry cooler dumps whatever is left.',
+        w:'parts' },
+    ] },
+
+  { key:'02', name:'Why it heats', cam:'rack', focus:['Rack3'],
+    tabs:[
+      { tab:'A rack', title:'One rack ≈ 40 kW.', lede:'About twenty kettles boiling at once — and it runs all day.', w:'rackIntro' },
+      { tab:'Turn up the load', title:'More compute → more heat.',
+        lede:'Slide the GPU load. Watch the chips glow and the numbers move — nothing is stored, it all comes out as heat.', w:'load' },
+      { tab:'No cooling?', title:'Cooling can never stop.',
+        lede:'Cut the cooling and the chips run away in seconds, then throttle to protect themselves. This is why cooling is 24/7.', w:'cooling' },
+    ] },
+
+  { key:'03', name:'Where it goes', cam:'trace', focus:F.PRIMARY,
+    tabs:[
+      { tab:'Follow the water', title:'Heat rides the water.',
+        lede:'Water picks heat off the chips (35 → 45°C), the pump sends it down to the plant room, and comes back cooled. A closed loop.', w:'traceFlow' },
+      { tab:'Flow rate', title:'Slower flow, hotter water.',
+        lede:'Drop the flow and each litre carries more heat, so it leaves hotter — useful later, but the chips sit warmer.', w:'flow' },
+    ] },
+
+  { key:'04', name:'Heat quality', cam:'hx', focus:F.HX,
+    tabs:[
+      { tab:'The exchanger', title:'It passes heat, it can\'t add it.',
+        lede:'Two water loops meet but never mix. Heat crosses the plates, so the second loop ends up a few degrees <b>below</b> the first.', w:'hx' },
+      { tab:'Hot enough?', title:'Same heat, different usefulness.',
+        lede:'42°C runs underfloor heating but can\'t give a hot shower. Send the water to each user and see who it reaches.', w:'thermo', cam:'plant', focus:F.PLANT.concat(['Greenhouse','RobotLab','District']) },
+      { tab:'Heat pump', title:'An elevator for heat.',
+        lede:'Spend a little electricity to lift the temperature. The warmer the input, the cheaper the lift (higher COP).', w:'heatpump', cam:'plant', focus:F.PLANT.concat(['HeatPump','District','HeatPumpOut']) },
+    ] },
+
+  { key:'05', name:'Who uses it', cam:'users', focus:F.USERS,
+    tabs:[
+      { tab:'Three users', title:'Right heat, right place.',
+        lede:'Each user wants a different temperature, amount, and time of day. Toggle the heat pump and watch who gets served.', w:'users' },
+      { tab:'24 hours', title:'Supply is flat, demand isn\'t.',
+        lede:'The data center makes heat all day; the greenhouse wants it mostly at night. Scrub the clock — the store bridges the gap.', w:'timeline' },
+    ] },
+
+  { key:'06', name:'You run it', cam:'wide', focus:null,
+    tabs:[
+      { tab:'Console', title:'Your turn at the controls.',
+        lede:'Change any slider and watch every number react. There is no single best setting — only trade-offs.', w:'console' },
+      { tab:'Compare', title:'Trade one thing for another.',
+        lede:'Save a plan, change the settings, and see what you gained — and what it cost.', w:'compare' },
+    ] },
+
+  { key:'07', name:'Recap', cam:'hero', focus:null,
+    tabs:[
+      { tab:'Takeaways', title:'Three things to remember.', lede:'', w:'recap' },
+    ] },
+];
+
+/* ════════════════ 6. Apply a step/tab to the 3D scene ════════════════ */
+let nightTarget=0, night=0, tankTarget=0.5, tankFill=0.5;
+function activeSpec(){ const st=STEPS[state.i]; return st.tabs[Math.min(state.tab, st.tabs.length-1)]; }
+function applyScene(){
+  const st=STEPS[state.i], spec=activeSpec(), r=sim();
+  const focus = spec.focus ?? st.focus;
+  for(const n in units){ const u=units[n]; const on = !focus || focus.includes(n); u.dim = on?1:0.12; if(u.label) u.label.style.opacity = on?1:0.12; }
+  // pipes
+  const showPipes = state.i>=2;
+  const temps={PrimaryHot:r.Tr,PrimaryCold:state.supply,SecondaryHot:r.T2,SecondaryMain:r.T2,ToGreenhouse:r.T2,ToTank:r.T2,Return:Math.max(r.T2-10,22),HeatPumpOut:65,Reject:r.T2};
+  for(const n in pipes){ const p=pipes[n]; let colored=false;
+    if(state.i===2) colored = p.d.set==='primary';
+    else if(state.i>=3) colored = (p.d.set!=='hp'||state.hp) && (p.d.set!=='reject' || r.rejected>1);
+    if(p.d.set==='primary' && !state.cooling) colored=false;
+    p.active=colored; p.temp=temps[n]; p.speed=(p.d.set==='primary'?state.flow*2.2:1.1)*(0.4+state.load);
+    const col=colored?tcol(p.temp):GRAY; p.tube.material.color.copy(col); p.tube.material.emissive.copy(colored?col:new THREE.Color(0)).multiplyScalar(.3);
+    p.inst.material.color.copy(col).lerp(new THREE.Color('#fff'),.45); p.inst.visible=colored;
+    units[n].g.visible = showPipes; }
+  compressor.material.color.set(state.hp?'#C0472B':'#9b9a8f'); compressor.material.emissive.set(state.hp?'#C0472B':'#000');
+  hxPlates.forEach((m,k)=>{ const c=tcol(k%2?r.T2:r.Tr); m.material.color.copy(c); m.material.emissive.copy(c); });
+  nightTarget = spec.w==='timeline' ? nightFromHour(state.hour) : 0;
+  flyTo(spec.cam || st.cam);
+  applyViews();
+}
+const nightFromHour=h=>{ const d=Math.cos(((h-13)/24)*Math.PI*2); return clamp(0.5-d*0.9,0,1); };
+
+/* "See inside" view toggles (SEED-style) */
+function applyViews(){
+  const v=state.views;
+  dcShell.material.userData.base = v.xray ? 0.12 : 1;
+  units.DataCenter.mats.forEach(m=>{ if(m===dcShell.material) return; });
+  envMats.forEach(m=>{ m.userData.base = v.cutaway ? (m===meadowMat?1:0.5) : (m===meadowMat?1:0); });
+  const bb=units.Boreholes; bb.dim = v.boreheat?1:0; if(bb.label) bb.label.style.opacity=v.boreheat?1:0;
+  bb.g.visible = v.boreheat;
+  document.getElementById('labels').style.opacity = v.labels?1:0.001;
+  renderRail();
+}
+
+/* ════════════════ 7. Render loop ════════════════ */
+const clock=new THREE.Clock(); const tmpM=new THREE.Matrix4(), tmpV=new THREE.Vector3();
+function frame(){
+  const dt=Math.min(clock.getDelta(),0.05), t=clock.elapsedTime, r=sim(), spec=activeSpec();
+  if(tween){ tween.t=Math.min(1,tween.t+dt/1.25); const k=ease(tween.t); camera.position.lerpVectors(tween.fromP,tween.toP,k); controls.target.lerpVectors(tween.fromT,tween.toT,k); if(tween.t>=1)tween=null; }
+  controls.update();
+  for(const n in units){ const u=units[n]; for(const m of u.mats) m.opacity += ((m.userData.base??1)*u.dim - m.opacity)*Math.min(1,dt*6); }
+  for(const m of envMats) m.opacity += ((m.userData.base??1) - m.opacity)*Math.min(1,dt*5);
+  // GPUs
+  const gc=tcol(MathUtils.mapLinear(r.chip,40,95,30,70));
+  gpuMats.forEach(({mat,rack,k})=>{ const fl=0.55+0.45*Math.abs(Math.sin(t*(3+rack)+k*1.7)); mat.color.copy(gc); mat.emissive.copy(gc).multiplyScalar(fl*(0.3+state.load)*(r.throttle?(Math.sin(t*12)>0?1.4:0.2):1)); });
+  if(!state.cooling){ state.chipRunaway=Math.min(98,state.chipRunaway+dt*7); if(spec.w==='cooling') updateLive(); }
+  // particles
+  for(const n in pipes){ const p=pipes[n]; if(!p.active||!units[n].g.visible)continue; p.offset=(p.offset+dt*p.speed/p.len)%1;
+    for(let k=0;k<p.count;k++){ const u=(k/p.count+p.offset)%1; p.path.getPointAt(u,tmpV); tmpM.makeTranslation(tmpV.x,tmpV.y,tmpV.z); p.inst.setMatrixAt(k,tmpM); } p.inst.instanceMatrix.needsUpdate=true; }
+  impeller.rotation.z += dt*8*state.flow*(state.cooling?1:0);
+  const rejecting = r.rejected>1 && state.i>=3; fans.forEach(f=>f.rotation.y += dt*(rejecting?8*(r.rejected/800+0.2):0.4));
+  compressor.scale.setScalar(state.hp?1+Math.sin(t*14)*0.04:1);
+  if(spec.w==='timeline'){ const supply=0.8*1000*state.load, D=SEASON[state.season]; const dem=D.lab*(state.hour>8&&state.hour<19?1:0.3)+D.gh*(0.25+0.75*nightFromHour(state.hour))+D.dist*0.9; tankTarget=clamp(0.5+(supply-dem)/900,0.08,0.95); }
+  else if(spec.w==='console'||spec.w==='compare') tankTarget=clamp(r.recoveryPct,0.1,0.95);
+  tankFill += (tankTarget-tankFill)*Math.min(1,dt*2); tankLevel.scale.y=Math.max(0.05,tankFill*2.6); tankLevel.position.y=-4.2+tankLevel.scale.y/2;
+  night += (nightTarget-night)*Math.min(1,dt*2);
+  scene.background.copy(BG_DAY).lerp(new THREE.Color('#2b3550'),night); scene.fog.color.copy(scene.background);
+  sun.intensity=2.0*(1-night*0.75); plantGlow.intensity = (state.i>=3?8:0)*(0.8+Math.sin(t*2)*0.1);
+  renderer.render(scene,camera); labelRenderer.render(scene,camera); requestAnimationFrame(frame);
+}
+
+/* raycast: click a rack in step 2 / click labels */
+const ray=new THREE.Raycaster(), mouse=new THREE.Vector2();
+renderer.domElement.addEventListener('click',e=>{ const spec=activeSpec(); if(!(state.i===1&&state.tab===0))return;
+  const rect=renderer.domElement.getBoundingClientRect(); mouse.set(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1); ray.setFromCamera(mouse,camera);
+  if(ray.intersectObjects(units.Rack3.g.children,false).length){ state.tab=1; render(); } });
+
+function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h); labelRenderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+addEventListener('resize',resize);
+
+/* ════════════════ 8. UI ════════════════ */
+const $=s=>document.querySelector(s);
+const fmt=(n,d=0)=>Number(n).toLocaleString('en-GB',{maximumFractionDigits:d,minimumFractionDigits:d});
+const arrow=d=>d>0?'<span class="arrow up">▲</span>':d<0?'<span class="arrow down">▼</span>':'<span class="arrow flat">▬</span>';
+
+/* consequence table: compare two sims, show which metrics moved */
+function conseqTable(before, after, rows, head='If you change this…'){
+  return `<div class="conseq"><div class="hd">${head}</div>`+rows.map(([label,get,unit,goodUp])=>{
+    const b=get(before),a=get(after), d=a-b; const good = goodUp? d>0 : d<0;
+    const cls = Math.abs(d)<0.5?'flat':good?'down':'up';
+    return `<div class="line"><span class="k">${label}</span><span class="v">${fmt(a,unit==='°C'||unit==='x'?1:0)}${unit}</span> <span class="arrow ${cls}">${Math.abs(d)<0.5?'▬':d>0?'▲':'▼'}</span></div>`;
+  }).join('')+`</div>`;
+}
+
+const WIDGETS = {
+  overview: ()=>({ html:`<div class="big-stat">100<span class="u">% → heat</span></div>
+    <div class="insight">A 1,000 kW hall turns almost all of that power into heat. The whole tour is about where it goes next.</div>` }),
+
+  parts: ()=>({ html:`<div class="insight" style="background:#fff;border:1px solid var(--hair);color:var(--ink)">
+    <b style="color:var(--green)">Compute</b> → <b style="color:var(--warm)">Plant room</b> → <b style="color:var(--green)">Heat users</b> → <b style="color:var(--bad)">Dry cooler</b> (leftovers).</div>
+    <div class="insight">Tip: use the <b>See inside</b> panel on the right — X-ray the building, show the ground cutaway, or reveal the boreholes.</div>` }),
+
+  rackIntro: ()=>({ html:`<div class="big-stat">40<span class="u">kW / rack</span></div>
+    <div class="insight">👉 Click a server rack in the scene to look closer.</div>` }),
+
+  load: ()=>{ const b={...state}; return { html:`
+    <div class="ctl"><div class="row">GPU load <b id="v-load"></b></div><input type="range" id="i-load" min="0.3" max="1" step="0.01" value="${state.load}"></div>
+    <div id="conseq"></div>`,
+    bind:()=>{ $('#i-load').oninput=e=>{ state.load=+e.target.value; applyScene(); updateLive(); }; },
+    live:r=>{ $('#v-load').textContent=fmt(state.load*100)+'%';
+      const lo=simulate({...state,load:0.3}); $('#conseq').innerHTML=conseqTable(lo,r,[
+        ['Rack power', x=>40*(x.P/1000), ' kW', false],
+        ['Chip temp', x=>x.chip, '°C', false],
+        ['Heat produced', x=>x.Q, ' kW', false],
+      ],'Raising the load…'); } }; },
+
+  cooling: ()=>({ html:`<button class="btn ${state.cooling?'warn':'ghost'}" id="b-cool">${state.cooling?'⚠ Turn off cooling':'Restore cooling'}</button>
+    <div class="ctl" style="margin-top:12px"><div class="row">Chip temperature <b id="v-chip"></b></div></div>
+    <div class="insight" id="v-status"></div>`,
+    bind:()=>$('#b-cool').onclick=()=>{ state.cooling=!state.cooling; if(state.cooling)state.chipRunaway=70; else state.chipRunaway=sim().chip; applyScene(); render(); },
+    live:r=>{ $('#v-chip').textContent=fmt(r.chip)+'°C';
+      $('#v-status').innerHTML = r.throttle? '<b style="color:var(--bad)">THROTTLING</b> — the chip slows itself to survive. Compute drops.'
+        : state.cooling? 'Cooling on — chip stable.' : 'Temperature climbing…'; } }),
+
+  traceFlow: ()=>({ html:`<div class="insight">Watch the glowing water: it leaves the chips at <b>45°C</b>, drops to the plant room, and returns cooled. A closed loop — the heat is moved, never destroyed.</div>
+    <div class="conseq"><div class="hd">Primary loop</div>
+      <div class="line"><span class="k">Supply to chips</span><span class="v">35°C</span></div>
+      <div class="line"><span class="k">Return from chips</span><span class="v" id="v-ret">45°C</span></div></div>`,
+    live:r=>{ const e=$('#v-ret'); if(e)e.textContent=fmt(r.Tr,1)+'°C'; } }),
+
+  flow: ()=>({ html:`<div class="ctl"><div class="row">Flow rate <b id="v-flow"></b></div><input type="range" id="i-flow" min="0.3" max="1" step="0.01" value="${state.flow}"></div><div id="conseq"></div>`,
+    bind:()=>$('#i-flow').oninput=e=>{ state.flow=+e.target.value; applyScene(); updateLive(); },
+    live:r=>{ $('#v-flow').textContent=fmt(state.flow*100)+'%'; const fast=simulate({...state,flow:1});
+      $('#conseq').innerHTML=conseqTable(fast,r,[['Return temp', x=>x.Tr,'°C',true],['Chip temp', x=>x.chip,'°C',false]],'Slowing the flow…'); } }),
+
+  hx: ()=>{ const r=sim(); return { html:`<div class="conseq"><div class="hd">Across the plates</div>
+    <div class="line"><span class="k">Primary (from chips)</span><span class="v">${fmt(r.Tr)}°C → ${fmt(state.supply)}°C</span></div>
+    <div class="line"><span class="k">Secondary (to users)</span><span class="v">${fmt(Math.max(r.T2-10,22))}°C → ${fmt(r.T2)}°C</span></div></div>
+    <div class="insight">The second loop always ends up a little <b>cooler</b> than the first. An exchanger moves heat; it can't make it hotter.</div>` }; },
+
+  thermo: ()=>({ html:`<div id="thermo"></div><div class="insight">Same water, different verdict — it's about <b>temperature</b>, not just how much heat you have.</div>`,
+    live:r=>{ $('#thermo').innerHTML=`<div class="conseq"><div class="hd">Secondary water: ${fmt(r.T2)}°C — who can use it?</div>`+
+      USERS.map(u=>{ const ok=r.T2>=u.need, near=!ok&&u.need-r.T2<=4; const chip=ok?'<span class="chip ok">direct</span>':near?'<span class="chip warn">needs a lift</span>':'<span class="chip bad">needs heat pump</span>';
+        return `<div class="line"><span class="k">${u.name} (${u.need}°C)</span>${chip}</div>`; }).join('')+`</div>`; } }),
+
+  heatpump: ()=>({ html:`<button class="btn ${state.hp?'ghost':'primary'}" id="b-hp">${state.hp?'Heat pump: ON (click to stop)':'Start heat pump'}</button><div id="conseq" style="margin-top:12px"></div>`,
+    bind:()=>$('#b-hp').onclick=()=>{ state.hp=!state.hp; applyScene(); render(); },
+    live:r=>{ const off=simulate({...state,hp:false}); $('#conseq').innerHTML=`<div class="conseq"><div class="hd">With the heat pump ${state.hp?'ON':'OFF'}</div>
+      <div class="line"><span class="k">Lift ratio (COP)</span><span class="v">${fmt(r.COP,1)}x</span></div>
+      <div class="line"><span class="k">District heating served</span><span class="v">${fmt((r.served.dist.frac)*100)}%</span></div>
+      <div class="line"><span class="k">Heat-pump electricity</span><span class="v">${fmt(r.hpElec)} kW</span></div></div>
+      <div class="insight">1 unit of electricity + ${fmt(r.COP-1,1)} units of ${fmt(r.T2)}°C heat → ${fmt(r.COP,1)} units of 65°C heat.</div>`; } }),
+
+  users: ()=>({ html:`<div class="seg" style="margin-bottom:10px"><span style="align-self:center;font-size:12px;color:var(--sub);margin-right:6px">Heat pump</span>
+      <button id="hp-on" class="${state.hp?'on':''}">On</button><button id="hp-off" class="${state.hp?'':'on'}">Off</button></div><div id="userlist"></div>`,
+    bind:()=>{ $('#hp-on').onclick=()=>{state.hp=true;applyScene();render();}; $('#hp-off').onclick=()=>{state.hp=false;applyScene();render();}; },
+    live:r=>{ const when={lab:'daytime',gh:'nights & winter',dist:'all day'}; $('#userlist').innerHTML=`<div class="conseq"><div class="hd">Secondary water ${fmt(r.T2)}°C</div>`+
+      USERS.map(u=>{ const s=r.served[u.k]; const chip={direct:'<span class="chip ok">direct</span>',hp:'<span class="chip warn">via heat pump</span>',none:'<span class="chip bad">unmet</span>'}[s.mode];
+        return `<div class="line"><span class="k">${u.name} · ${u.need}°C · ${when[u.k]}</span>${chip} <span class="v">${fmt(s.frac*100)}%</span></div>`; }).join('')+`</div>`; } }),
+
+  timeline: ()=>({ html:`<div class="ctl"><div class="row">Time of day <b id="v-hour"></b></div><input type="range" id="i-hour" min="0" max="23.9" step="0.1" value="${state.hour}"></div>
+    <svg viewBox="0 0 300 110" width="100%" id="chart" style="background:#fff;border:1px solid var(--hair);border-radius:12px"></svg>
+    <div class="insight" id="v-bridge"></div>`,
+    bind:()=>$('#i-hour').oninput=e=>{ state.hour=+e.target.value; nightTarget=nightFromHour(state.hour); updateLive(); },
+    live:()=>{ const supply=0.8*1000*state.load, D=SEASON[state.season];
+      const dem=h=>D.lab*(h>8&&h<19?1:0.3)+D.gh*(0.25+0.75*nightFromHour(h))+D.dist*(0.8+0.2*Math.cos((h-7)/24*Math.PI*2));
+      const X=h=>h/24*300, Y=v=>100-v/1000*90; let path=''; for(let h=0;h<=24;h+=0.5)path+=(h?'L':'M')+X(h).toFixed(1)+' '+Y(dem(h)).toFixed(1);
+      $('#chart').innerHTML=`<path d="M0 ${Y(supply)} L300 ${Y(supply)}" stroke="#E07B39" stroke-width="2.5" fill="none"/><path d="${path}" stroke="#2E5E3A" stroke-width="2.5" fill="none"/>
+        <line x1="${X(state.hour)}" x2="${X(state.hour)}" y1="4" y2="104" stroke="#1C2321" stroke-width="1.2" opacity=".5"/>
+        <text x="4" y="12" style="fill:#E07B39;font-weight:700">supply</text><text x="4" y="98" style="fill:#2E5E3A;font-weight:700">demand</text>`;
+      const diff=supply-dem(state.hour); $('#v-hour').textContent=String(Math.floor(state.hour)).padStart(2,'0')+':'+String(Math.round(state.hour%1*60)).padStart(2,'0');
+      $('#v-bridge').innerHTML = diff>0? `Surplus <b>+${fmt(diff)} kW</b> → charging the thermal store.` : `Shortfall <b>${fmt(diff)} kW</b> → drawing from the store.`; } }),
+
+  console: ()=>({ html:consoleHTML()+`<div id="score"></div>`, bind:bindConsole, live:r=>{ liveUsers(r); liveConseq(r); } }),
+
+  compare: ()=>({ html:consoleHTML(true)+`<button class="btn ghost" id="b-save" style="margin-top:10px">Save current as Plan A</button><div id="cmp" style="margin-top:10px"></div>`,
+    bind:()=>{ bindConsole(); $('#b-save').onclick=()=>{ state.planA={...sim(),supply:state.supply}; updateLive(); }; },
+    live:r=>{ liveUsers(r); const A=state.planA, B={...r,supply:state.supply};
+      const rows=[['Supply temp',x=>x.supply,'°C'],['Usable heat',x=>x.usable,' kW'],['Recovery',x=>x.recoveryPct*100,'%'],['HP electricity',x=>x.hpElec,' kW'],['Chip temp',x=>x.chip,'°C'],['Net cost',x=>x.cost,' £/h']];
+      $('#cmp').innerHTML = `<div class="conseq"><div class="hd">Plan A → B (current)</div>`+rows.map(([n,g,u])=>`<div class="line"><span class="k">${n}</span><span class="v">${A?fmt(g(A),u==='°C'?1:0)+u+' → ':''}${fmt(g(B),u==='°C'?1:0)}${u}</span></div>`).join('')+`</div>`; } }),
+
+  recap: ()=>{ const r=sim(); return { html:`
+    <div class="conseq"><div class="hd">Three things to remember</div>
+      <div class="line"><span class="k">1 · Almost all electricity becomes heat</span></div>
+      <div class="line"><span class="k">2 · Water carries the heat around</span></div>
+      <div class="line"><span class="k">3 · Temperature decides where it's useful</span></div></div>
+    <div class="insight">Your last setup recovered <b>${fmt(r.recoveryPct*100)}%</b> of the heat at <b>£${fmt(r.cost)}/h</b>, chips at <b>${fmt(r.chip)}°C</b>.</div>
+    <button class="btn primary" id="b-again" style="margin-top:10px">Play with the console again</button>`,
+    bind:()=>$('#b-again').onclick=()=>{ state.i=5; state.tab=0; render(); } }; },
+};
+
+function consoleHTML(compact){ return `
+  <div class="ctl"><div class="row">GPU load <b id="v-load"></b></div><input type="range" id="i-load" min="0.3" max="1" step="0.01" value="${state.load}"></div>
+  <div class="ctl"><div class="row">Coolant supply temp <b id="v-sup"></b></div><input type="range" id="i-sup" min="25" max="40" step="0.5" value="${state.supply}"></div>
+  <div class="ctl"><div class="row">Season</div><div class="seg">${Object.entries(SEASON).map(([k,s])=>`<button data-season="${k}" class="${state.season===k?'on':''}">${s.label.split(' ')[0]}</button>`).join('')}</div></div>
+  ${compact?'':`<div class="ctl"><div class="row">Heat pump</div><div class="seg"><button data-hp="1" class="${state.hp?'on':''}">On</button><button data-hp="0" class="${state.hp?'':'on'}">Off</button></div></div>`}
+  <div id="users"></div>`; }
+function bindConsole(){
+  $('#i-load').oninput=e=>{state.load=+e.target.value;applyScene();updateLive();};
+  $('#i-sup').oninput=e=>{state.supply=+e.target.value;applyScene();updateLive();};
+  document.querySelectorAll('[data-season]').forEach(b=>b.onclick=()=>{state.season=b.dataset.season;applyScene();render();});
+  document.querySelectorAll('[data-hp]').forEach(b=>b.onclick=()=>{state.hp=b.dataset.hp==='1';applyScene();render();});
+}
+function liveUsers(r){ const e=$('#v-load'); if(e)e.textContent=fmt(state.load*100)+'%'; const s=$('#v-sup'); if(s)s.textContent=fmt(state.supply,1)+'°C'+(r.chillerOn?' (chiller on)':'');
+  const u=$('#users'); if(u) u.innerHTML=`<div class="conseq"><div class="hd">Live result</div>
+    <div class="line"><span class="k">Heat recovered</span><span class="v">${fmt(r.recoveryPct*100)}%</span></div>
+    <div class="line"><span class="k">Usable heat</span><span class="v">${fmt(r.usable)} kW</span></div>
+    <div class="line"><span class="k">Chip temp</span><span class="v">${fmt(r.chip)}°C</span> ${r.throttle?'<span class="chip bad">throttle</span>':''}</div>
+    <div class="line"><span class="k">Net running cost</span><span class="v">£${fmt(r.cost)}/h</span></div></div>`; }
+function liveConseq(r){ const s=$('#score'); if(!s)return; const warm=simulate({...state,supply:40}), cold=simulate({...state,supply:25});
+  s.innerHTML=`<div class="insight">Try the extremes: a <b>warmer</b> supply (40°C) recovers more and runs the heat pump cheaper, but chips sit at <b>${fmt(warm.chip)}°C</b>. A <b>colder</b> supply (25°C) keeps chips at <b>${fmt(cold.chip)}°C</b> but fires up the chiller and costs more.</div>`; }
+
+let currentLive=null;
+function updateLive(){ const r=sim(); if(currentLive)currentLive(r); }
+
+/* top-level render of the card + tabs + tour bar + rail */
+function renderRail(){
+  const v=state.views; const items=[['xray','X-ray the building'],['cutaway','Ground cutaway'],['boreheat','Show boreholes'],['labels','Labels']];
+  $('#rail-btns').innerHTML=items.map(([k,t])=>`<button data-v="${k}" class="${v[k]?'on':''}"><span class="sw"></span>${t}</button>`).join('');
+  $('#rail-btns').querySelectorAll('button').forEach(b=>b.onclick=()=>{ state.views[b.dataset.v]=!state.views[b.dataset.v]; applyViews(); });
+}
+function render(){
+  const st=STEPS[state.i]; state.tab=Math.min(state.tab, st.tabs.length-1); const spec=st.tabs[state.tab];
+  state.maxStep=Math.max(state.maxStep, state.i);
+  $('#eyebrow').textContent = `${st.key} · ${st.name}`.toUpperCase();
+  $('#title').textContent = spec.title;
+  $('#lede').innerHTML = spec.lede;
+  $('#tabs').innerHTML = st.tabs.length>1 ? st.tabs.map((tb,k)=>`<button class="tab ${k===state.tab?'on':''}" data-t="${k}">${tb.tab}</button>`).join('') : '';
+  $('#tabs').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ state.tab=+b.dataset.t; render(); });
+  const w = WIDGETS[spec.w] ? WIDGETS[spec.w]() : {html:''};
+  $('#panel').innerHTML = w.html || ''; w.bind && w.bind(); currentLive = w.live || null;
+  $('#foot').textContent = `Illustrative model · tour step ${st.key} of 07`;
+  // tour bar
+  $('#step-name').textContent = st.name; $('#step-count').textContent = `${st.key} / 07`;
+  $('#dots').innerHTML = STEPS.map((s,k)=>`<span class="d ${k<state.i?'done':k===state.i?'now':''}" data-k="${k}"></span>`).join('');
+  $('#dots').querySelectorAll('.d').forEach(d=>d.onclick=()=>{ const k=+d.dataset.k; if(k<=state.maxStep){state.i=k;state.tab=0;render();} });
+  $('#prev').disabled = state.i===0 && state.tab===0;
+  $('#next').textContent = state.i===STEPS.length-1 ? 'Done ✓' : (state.tab<st.tabs.length-1 ? 'Next ›' : 'Next step →');
+  $('#next').disabled = state.i===STEPS.length-1;
+  $('#prev').textContent = (state.tab>0) ? '‹ Back' : '← Back';
+  applyScene(); updateLive();
+  history.replaceState(null,'','#'+st.key+(state.tab?('.'+(state.tab+1)):''));
+}
+
+/* navigation: Next walks through tabs first, then advances the step */
+function next(){ const st=STEPS[state.i]; if(state.tab < st.tabs.length-1){ state.tab++; } else if(state.i<STEPS.length-1){ state.i++; state.tab=0; } render(); }
+function prev(){ if(state.tab>0){ state.tab--; } else if(state.i>0){ state.i--; state.tab=STEPS[state.i].tabs.length-1; } render(); }
+$('#next').onclick=next; $('#prev').onclick=prev;
+$('#btn-restart').onclick=()=>{ Object.assign(state,{i:0,tab:0,planA:null,load:0.9,supply:35,flow:0.6,season:'winter',hp:false,cooling:true,chipRunaway:70,hour:22}); render(); };
+$('#btn-help').onclick=()=>alert('Controls:\n• Drag to orbit, scroll to zoom\n• Next / Back (or ← → keys) to move through the tour\n• Tabs switch sub-views within a step\n• "See inside" (right) toggles X-ray, cutaway, boreholes\n• Sliders & buttons in each step change the simulation live');
+addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT')return; if(e.key==='ArrowRight')next(); if(e.key==='ArrowLeft')prev(); });
+
+/* deep link #04.2 */
+const m=location.hash.match(/#(\d+)(?:\.(\d+))?/); if(m){ const si=STEPS.findIndex(s=>s.key===m[1].padStart(2,'0')); if(si>=0){ state.i=si; state.maxStep=si; state.tab=(+(m[2]||1))-1; } }
+resize(); render(); frame();
+</script>
+</body>
+</html>
